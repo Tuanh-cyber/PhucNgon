@@ -42,8 +42,9 @@ app.include_router(attempts.assignments_router)
 
 
 # ── Static files: ảnh từ vựng + audio câu hỏi/câu mẫu ────────────────────────
-# Thư mục gốc đọc từ settings.STATIC_ASSETS_BASE_DIR (mặc định: thư mục cha của repo).
-# Tên thư mục THẬT trên đĩa: Picture / command_audio_wav / sentence_instance_wav.
+# Thư mục gốc đọc từ settings.STATIC_ASSETS_BASE_DIR (mặc định: <repo>/media — nằm trong
+# repo để deploy cùng lên Render).
+# Tên thư mục THẬT trên đĩa: Picture / Vocab / command_audio_wav / sentence_instance_wav.
 # Thư mục thiếu -> LOG WARNING nhưng KHÔNG crash (vd audio vocab chưa có, môi trường CI
 # không có file tĩnh) — request tới mount thiếu sẽ trả 404, frontend tự xử lý.
 _STATIC_MOUNTS = [

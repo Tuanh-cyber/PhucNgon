@@ -47,9 +47,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:19006",
     ]
 
-    # STATIC_ASSETS_BASE_DIR: Thư mục GỐC chứa Picture/, command_audio_wav/, sentence_instance_wav/.
-    # Default = thư mục cha của repo. Override từ .env khi deploy (vd volume mount Render).
-    STATIC_ASSETS_BASE_DIR: str = str(Path(__file__).resolve().parents[3])
+    # STATIC_ASSETS_BASE_DIR: Thư mục GỐC chứa Picture/, Vocab/, command_audio_wav/,
+    # sentence_instance_wav/. Default = <repo>/media (media nằm TRONG repo để deploy
+    # cùng lên Render). Tính từ __file__ (app/core/config.py -> parents[2] = gốc repo)
+    # nên chạy đúng cả local lẫn Render. Override được từ .env nếu cần (vd volume mount).
+    STATIC_ASSETS_BASE_DIR: str = str(Path(__file__).resolve().parents[2] / "media")
 
     # ASR (Module 2 - Vy). "fake" hoặc "real". Mặc định "fake" cho tới khi Vy finetune xong.
     # Deploy prod: set ASR_MODE="real" + ASR_SERVICE_URL="https://anh-ngotuananh29--phucngon-asr-asrservice-web.modal.run"
