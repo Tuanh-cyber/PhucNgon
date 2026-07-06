@@ -29,7 +29,7 @@ services:
 databases:
   - name: phucngon-db                     # ← Tên service (tham chiếu từ web service)
     databaseName: phucngon_db             # Tên database thực
-    user: postgres                        # User mặc định
-    plan: standard                        # Plan: free/starter/standard/professional/business
+    # ⚠️ Bỏ 'user': Render tự tạo user ứng dụng + mật khẩu ngẫu nhiên, inject vào DATABASE_URL
+    plan: starter                         # Gói rẻ nhất có Postgres (Render không cung cấp free tier Postgres)
     region: oregon                        # Region (tuỳ chọn)
-    postgresMajorVersion: 15              # PostgreSQL major version (15, 14, 13, ...)
+    postgresMajorVersion: 15              # PostgreSQL major version (số nguyên: 15, 14, 13, 12)
