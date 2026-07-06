@@ -1,0 +1,33 @@
+services:
+  # ── Web service: FastAPI backend ─────────────────────────────────────────────
+  - type: web
+    name: phucngon-api
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt && \
+      alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: phucngon-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+        scope: service
+        description: "JWT signing secret (32+ chars, randomly generated per deploy)"
+      - key: CORS_ORIGINS
+        value: "https://phucngon.app"
+      - key: ASR_MODE
+        value: "real"
+      - key: ASR_SERVICE_URL
+        value: "https://anh-ngotuananh29--phucngon-asr-asrservice-web.modal.run"
+      - key: APP_ENV
+        value: "production"
+
+  # ── Managed Postgres database ───────────────────────────────────────────────
+  - type: pserv
+    name: phucngon-db
+    ipAllowList: []  # Allow all (default)
+    plan: standard  # Or starter/standard/professional
+    postgreSQLVersion: "15"
