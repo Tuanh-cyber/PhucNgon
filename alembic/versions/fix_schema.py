@@ -28,7 +28,10 @@ def upgrade() -> None:
                existing_type=postgresql.JSONB(astext_type=sa.Text()),
                nullable=True)
     op.drop_column('command_assets', 'audio_file')
-    op.add_column('exercises', sa.Column('target_command_id', sa.UUID(), nullable=True))
+    # IDEMPOTENT: intial_schema (bản hiện tại) đã tạo exercises KÈM target_command_id + FK.
+    # DB cũ (đã migrate trước khi intial_schema được sửa) thì CHƯA có -> ADD COLUMN IF NOT EXISTS
+    # xử lý được cả hai: DB sạch (Neon) bỏ qua, DB cũ thì thêm. Tránh lỗi DuplicateColumn.
+    op.execute('ALTER TABLE exercises ADD COLUMN IF NOT EXISTS target_command_id UUID')
     op.execute('ALTER TABLE exercises DROP CONSTRAINT IF EXISTS ck_exercise_target_exclusivity')
     op.create_check_constraint(
         'ck_exercise_target_exclusivity',
@@ -40,7 +43,25 @@ def upgrade() -> None:
         " AND target_sentence_instance_id IS NOT NULL AND target_vocab_id IS NULL"
         " AND target_command_id IS NULL)"
     )
-    op.create_foreign_key(None, 'exercises', 'command_assets', ['target_command_id'], ['id'])
+    # IDEMPOTENT: chỉ tạo FK nếu CHƯA có FK nào trên cột target_command_id (intial_schema có thể đã tạo).
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                WHERE tc.table_name = 'exercises'
+                  AND tc.constraint_type = 'FOREIGN KEY'
+                  AND kcu.column_name = 'target_command_id'
+            ) THEN
+                ALTER TABLE exercises
+                    ADD CONSTRAINT fk_exercises_target_command_id
+                    FOREIGN KEY (target_command_id) REFERENCES command_assets(id);
+            END IF;
+        END $$;
+    """)
     op.alter_column('sentence_instance_assets', 'audio_file',
                existing_type=sa.VARCHAR(length=255),
                nullable=True)
