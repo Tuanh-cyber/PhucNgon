@@ -8,28 +8,25 @@ services:
       alembic upgrade head
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      # DATABASE_URL: Neon (external free Postgres)
+      # ⚠️ ĐẶT BẰNG TÁCH TRÊN RENDER DASHBOARD (không commit password vào repo)
+      # Format Neon: postgresql://user:pass@host/db?sslmode=require
+      # Backend: tự đổi postgres:// -> postgresql+psycopg:// + xử lý SSL tự động via psycopg
       - key: DATABASE_URL
-        fromDatabase:
-          name: phucngon-db                 # ← Khớp với tên database ở khối databases:
-          property: connectionString
+
       - key: JWT_SECRET
         generateValue: true
         scope: service
         description: "JWT signing secret (32+ chars, randomly generated per deploy)"
+
       - key: CORS_ORIGINS
         value: "https://phucngon.app"
+
       - key: ASR_MODE
         value: "real"
+
       - key: ASR_SERVICE_URL
         value: "https://anh-ngotuananh29--phucngon-asr-asrservice-web.modal.run"
+
       - key: APP_ENV
         value: "production"
-
-# ── Managed Postgres database (khối riêng) ────────────────────────────────────────
-databases:
-  - name: phucngon-db                     # ← Tên service (tham chiếu từ web service)
-    databaseName: phucngon_db             # Tên database thực
-    # ⚠️ Bỏ 'user': Render tự tạo user ứng dụng + mật khẩu ngẫu nhiên, inject vào DATABASE_URL
-    plan: starter                         # Gói rẻ nhất có Postgres (Render không cung cấp free tier Postgres)
-    region: oregon                        # Region (tuỳ chọn)
-    postgresMajorVersion: 15              # PostgreSQL major version (số nguyên: 15, 14, 13, 12)
