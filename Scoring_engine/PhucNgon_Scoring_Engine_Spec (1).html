@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhụcNgôn — Scoring Engine Technical Spec</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0D0F12;
+  --bg2:       #141720;
+  --bg3:       #1C2030;
+  --bg4:       #242840;
+  --line:      #2A2E42;
+  --line2:     #363B55;
+  --fg:        #E4E8F5;
+  --fg2:       #9BA3C4;
+  --fg3:       #5C6488;
+  --green:     #3DD68C;
+  --green-dim: #1A3D2E;
+  --yellow:    #F5C842;
+  --yellow-dim:#2E2A12;
+  --orange:    #F5864A;
+  --orange-dim:#2E1A0E;
+  --red:       #F05C5C;
+  --red-dim:   #2E1212;
+  --blue:      #5C9EF5;
+  --blue-dim:  #121D30;
+  --purple:    #A07AF5;
+  --purple-dim:#1E1230;
+  --teal:      #3DCCC0;
+  --teal-dim:  #0E2826;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── LAYOUT ── */
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 32px 100px; }
+
+/* ── HEADER ── */
+.site-header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--line);
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 52px;
+}
+.header-logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.header-path {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg3);
+}
+.header-path span { color: var(--fg2); }
+.header-badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  background: var(--green-dim);
+  color: var(--green);
+  border: 1px solid var(--green);
+  padding: 2px 10px;
+  border-radius: 2px;
+  letter-spacing: .06em;
+}
+
+/* ── HERO ── */
+.hero {
+  padding: 64px 0 48px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 64px;
+}
+.hero-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+.hero h1 {
+  font-family: var(--mono);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--fg);
+  margin-bottom: 12px;
+}
+.hero h1 .accent { color: var(--green); }
+.hero-sub {
+  font-size: 15px;
+  color: var(--fg2);
+  max-width: 600px;
+  line-height: 1.65;
+  margin-bottom: 32px;
+}
+.meta-row {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  overflow: hidden;
+  width: fit-content;
+}
+.meta-item {
+  padding: 8px 20px;
+  border-right: 1px solid var(--line2);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.meta-item:last-child { border-right: none; }
+.meta-item .k { color: var(--fg3); margin-right: 8px; }
+.meta-item .v { color: var(--fg); font-weight: 500; }
+
+/* ── TOC ── */
+.toc {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: 4px;
+  padding: 24px 28px;
+  margin-bottom: 56px;
+}
+.toc-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg3);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.toc-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 32px;
+}
+@media(max-width:600px){ .toc-list{grid-template-columns:1fr;} }
+.toc-list a {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg2);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  transition: color .15s;
+}
+.toc-list a:hover { color: var(--green); }
+.toc-list a .idx {
+  color: var(--fg3);
+  font-size: 10px;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+/* ── SECTIONS ── */
+.section { margin-bottom: 72px; }
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg3);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.section h2 {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 28px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.section h2 .accent { color: var(--green); }
+
+.section h3 {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 32px 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section h3 .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-green  { background: var(--green); }
+.dot-yellow { background: var(--yellow); }
+.dot-blue   { background: var(--blue); }
+.dot-purple { background: var(--purple); }
+.dot-teal   { background: var(--teal); }
+.dot-orange { background: var(--orange); }
+.dot-red    { background: var(--red); }
+
+p { color: var(--fg2); margin-bottom: 14px; line-height: 1.7; }
+p:last-child { margin-bottom: 0; }
+strong { color: var(--fg); font-weight: 600; }
+
+/* ── CODE BLOCKS ── */
+.code-block {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 18px 0;
+  overflow: hidden;
+}
+.code-block-header {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.code-block-header .lang {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg3);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.code-block-header .file {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg2);
+  margin-left: auto;
+}
+.code-block pre {
+  padding: 18px 20px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+  overflow-x: auto;
+  white-space: pre;
+}
+.kw  { color: var(--purple); }
+.fn  { color: var(--blue); }
+.str { color: var(--green); }
+.num { color: var(--orange); }
+.cmt { color: var(--fg3); font-style: italic; }
+.op  { color: var(--fg2); }
+.var { color: var(--teal); }
+.const { color: var(--yellow); }
+
+/* ── FORMULA CARD ── */
+.formula-card {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-top: 3px solid;
+  border-radius: 6px;
+  padding: 24px 28px;
+  margin: 18px 0;
+}
+.formula-card.fc-green  { border-top-color: var(--green); }
+.formula-card.fc-blue   { border-top-color: var(--blue); }
+.formula-card.fc-purple { border-top-color: var(--purple); }
+.formula-card.fc-teal   { border-top-color: var(--teal); }
+.formula-card.fc-yellow { border-top-color: var(--yellow); }
+
+.fc-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg3);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.fc-formula {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.9;
+  margin-bottom: 16px;
+}
+.fc-formula .var2 { color: var(--teal); }
+.fc-formula .num2 { color: var(--orange); }
+.fc-formula .op2  { color: var(--fg3); }
+.fc-components {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.fc-comp {
+  background: var(--bg3);
+  border-radius: 4px;
+  padding: 10px 13px;
+}
+.fc-comp .fc-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--teal);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.fc-comp .fc-desc {
+  font-size: 11.5px;
+  color: var(--fg2);
+  line-height: 1.5;
+}
+.fc-note {
+  font-size: 12px;
+  color: var(--fg3);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-style: italic;
+}
+
+/* ── TABLES ── */
+.tbl-wrap {
+  overflow-x: auto;
+  margin: 18px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--bg2);
+}
+thead tr { background: var(--bg3); }
+thead th {
+  padding: 11px 14px;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--fg3);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+tbody tr { border-bottom: 1px solid var(--line); }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--bg3); }
+td {
+  padding: 10px 14px;
+  color: var(--fg2);
+  line-height: 1.5;
+  vertical-align: top;
+}
+td:first-child { color: var(--fg); font-weight: 500; }
+td code, th code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--bg3);
+  padding: 2px 7px;
+  border-radius: 3px;
+  color: var(--teal);
+  border: 1px solid var(--line2);
+}
+
+/* ── BADGES ── */
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  vertical-align: middle;
+  letter-spacing: .04em;
+  font-weight: 500;
+}
+.b-green  { background: var(--green-dim);  color: var(--green);  border-color: var(--green); }
+.b-yellow { background: var(--yellow-dim); color: var(--yellow); border-color: var(--yellow); }
+.b-orange { background: var(--orange-dim); color: var(--orange); border-color: var(--orange); }
+.b-red    { background: var(--red-dim);    color: var(--red);    border-color: var(--red); }
+.b-blue   { background: var(--blue-dim);   color: var(--blue);   border-color: var(--blue); }
+.b-purple { background: var(--purple-dim); color: var(--purple); border-color: var(--purple); }
+.b-teal   { background: var(--teal-dim);   color: var(--teal);   border-color: var(--teal); }
+
+/* ── CALLOUTS ── */
+.callout {
+  border-radius: 4px;
+  padding: 16px 20px;
+  margin: 18px 0;
+  border-left: 3px solid;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.callout p { font-size: 13px; margin: 0; }
+.callout-green  { background: var(--green-dim);  border-color: var(--green);  color: var(--fg2); }
+.callout-yellow { background: var(--yellow-dim); border-color: var(--yellow); color: var(--fg2); }
+.callout-red    { background: var(--red-dim);    border-color: var(--red);    color: var(--fg2); }
+.callout-blue   { background: var(--blue-dim);   border-color: var(--blue);   color: var(--fg2); }
+
+/* ── FLOW DIAGRAM ── */
+.flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.flow-node {
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg);
+  white-space: nowrap;
+}
+.flow-arrow {
+  color: var(--fg3);
+  font-size: 16px;
+  padding: 0 8px;
+  font-family: var(--mono);
+}
+.flow-node.fn-green  { border-color: var(--green);  color: var(--green); }
+.flow-node.fn-yellow { border-color: var(--yellow); color: var(--yellow); }
+.flow-node.fn-red    { border-color: var(--red);    color: var(--red); }
+.flow-node.fn-blue   { border-color: var(--blue);   color: var(--blue); }
+
+/* ── TYPE CARDS ── */
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.type-card {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.type-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.tc-green::before  { background: var(--green); }
+.tc-blue::before   { background: var(--blue); }
+.tc-purple::before { background: var(--purple); }
+.tc-teal::before   { background: var(--teal); }
+
+.type-card .tc-id {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg3);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.type-card .tc-name {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 8px;
+}
+.type-card .tc-desc {
+  font-size: 12px;
+  color: var(--fg2);
+  line-height: 1.55;
+}
+
+/* ── RESULT ROW ── */
+.result-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin: 18px 0;
+}
+@media(max-width:600px){ .result-row{grid-template-columns:1fr;} }
+.result-card {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px 18px;
+}
+.result-card .rc-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.rc-pass .rc-label { color: var(--green); }
+.rc-near .rc-label { color: var(--yellow); }
+.rc-retry .rc-label { color: var(--red); }
+.result-card .rc-range {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.rc-pass .rc-range  { color: var(--green); }
+.rc-near .rc-range  { color: var(--yellow); }
+.rc-retry .rc-range { color: var(--red); }
+.result-card .rc-desc {
+  font-size: 12px;
+  color: var(--fg2);
+  line-height: 1.55;
+}
+
+/* ── DIVIDER ── */
+.divider { border: none; border-top: 1px solid var(--line); margin: 56px 0; }
+
+/* ── FOOTER ── */
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 28px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg3);
+  text-align: center;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
+
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+.section { animation: fadeIn .4s ease both; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="header-logo">PhụcNgôn</div>
+    <div class="header-path">/ scoring_engine / <span>technical_spec.md</span></div>
+    <div class="header-badge">MVP v1</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">PhụcNgôn · Internal Technical Document</div>
+  <h1>Scoring Engine<br><span class="accent">Technical Specification</span></h1>
+  <p class="hero-sub">Đặc tả kỹ thuật đầy đủ cho Scoring Engine — bao gồm công thức chấm điểm theo từng loại bài, logic phân loại kết quả, progression rule, và cơ chế difficulty weighting theo vocab level.</p>
+  <div class="meta-row">
+    <div class="meta-item"><span class="k">owner</span><span class="v">Nam</span></div>
+    <div class="meta-item"><span class="k">scope</span><span class="v">MVP Phase 1</span></div>
+    <div class="meta-item"><span class="k">exercise types</span><span class="v">3 types · 4 sub-modes</span></div>
+    <div class="meta-item"><span class="k">library</span><span class="v">python-Levenshtein · underthesea</span></div>
+  </div>
+</div>
+
+<!-- TOC -->
+<nav class="toc">
+  <div class="toc-title">// table_of_contents</div>
+  <ul class="toc-list">
+    <li><a href="#s1"><span class="idx">01</span>Tổng quan kiến trúc Scoring Engine</a></li>
+    <li><a href="#s2"><span class="idx">02</span>Text Normalization Pipeline</a></li>
+    <li><a href="#s3"><span class="idx">03</span>NAM — Naming Score</a></li>
+    <li><a href="#s4"><span class="idx">04</span>CMD Mode 1 — Recognition (Correct/Incorrect)</a></li>
+    <li><a href="#s5"><span class="idx">05</span>CMD Mode 2 — Repetition Score</a></li>
+    <li><a href="#s6"><span class="idx">06</span>SEN — Sentence Building Score</a></li>
+    <li><a href="#s7"><span class="idx">07</span>Fluency Component</a></li>
+    <li><a href="#s8"><span class="idx">08</span>Result Classification — Pass / Near / Retry</a></li>
+    <li><a href="#s9"><span class="idx">09</span>Vocab Level Progression (in-session)</a></li>
+    <li><a href="#s10"><span class="idx">10</span>Vocab Level Difficulty Weighting</a></li>
+    <li><a href="#s11"><span class="idx">11</span>Attempt & Fallback Handling (SEN)</a></li>
+    <li><a href="#s12"><span class="idx">12</span>Score Output Schema</a></li>
+  </ul>
+</nav>
+
+<!-- ══════════════════════════════════ S1 ══════════════════════════════════ -->
+<section class="section" id="s1">
+  <div class="section-label">// 01</div>
+  <h2>Tổng Quan Kiến Trúc <span class="accent">Scoring Engine</span></h2>
+
+  <p>Scoring Engine nhận vào transcript từ ASR và metadata của bài tập, trả về điểm số và kết quả phân loại. Engine được chia thành <strong>4 sub-scorer riêng biệt</strong> tương ứng với 4 sub-mode của 3 exercise type. Mỗi sub-scorer có công thức trọng số khác nhau phản ánh yêu cầu lâm sàng của từng loại bài.</p>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span><span class="file">scoring_engine/router.py</span></div>
+    <pre>
+<span class="kw">def</span> <span class="fn">score</span>(exercise: <span class="var">Exercise</span>, transcript: <span class="var">str</span>, audio_duration: <span class="var">float</span>) -> <span class="var">ScoreResult</span>:
+    <span class="cmt"># Gate 1: reject invalid ASR output before scoring</span>
+    <span class="kw">if</span> <span class="fn">is_invalid_input</span>(transcript, audio_duration):
+        <span class="kw">return</span> <span class="var">ScoreResult</span>.<span class="fn">invalid</span>()
+
+    <span class="cmt"># Route to correct sub-scorer by exercise type + mode</span>
+    <span class="kw">match</span> exercise.type:
+        <span class="kw">case</span> <span class="str">"naming"</span>:
+            <span class="kw">return</span> <span class="fn">score_naming</span>(exercise, transcript, audio_duration)
+
+        <span class="kw">case</span> <span class="str">"command_identification"</span>:
+            <span class="kw">if</span> exercise.mode == <span class="str">"recognition"</span>:
+                <span class="kw">return</span> <span class="fn">evaluate_cmd_recognition</span>(exercise, selected_vocab_id)  <span class="cmt"># Correct/Incorrect, no score</span>
+            <span class="kw">else</span>:
+                <span class="kw">return</span> <span class="fn">score_cmd_repetition</span>(exercise, transcript, audio_duration)
+
+        <span class="kw">case</span> <span class="str">"sentence_building"</span>:
+            <span class="kw">return</span> <span class="fn">score_sentence</span>(exercise, transcript, audio_duration, attempt_number)
+</pre>
+  </div>
+
+  <div class="type-grid">
+    <div class="type-card tc-green">
+      <div class="tc-id">NAM</div>
+      <div class="tc-name">Naming</div>
+      <div class="tc-desc">Nhìn ảnh → nói tên. Trọng tâm: keyword match + classifier. Dùng ASR.</div>
+    </div>
+    <div class="type-card tc-blue">
+      <div class="tc-id">CMD / Mode 1</div>
+      <div class="tc-name">Recognition</div>
+      <div class="tc-desc">Nghe mô tả → chọn đáp án touch. Chỉ Correct / Incorrect, không tính điểm. Không dùng ASR.</div>
+    </div>
+    <div class="type-card tc-purple">
+      <div class="tc-id">CMD / Mode 2</div>
+      <div class="tc-name">Repetition</div>
+      <div class="tc-desc">Nghe mô tả + nhìn ảnh → nói tên. Như Naming nhưng đã có audio cue.</div>
+    </div>
+    <div class="type-card tc-teal">
+      <div class="tc-id">SEN</div>
+      <div class="tc-name">Sentence Building</div>
+      <div class="tc-desc">Câu khuyết + ảnh → nói đủ câu. Phức tạp nhất: 5 thành phần scoring.</div>
+    </div>
+  </div>
+
+  <div class="callout callout-yellow">
+    <p><strong>Input gate:</strong> Trước khi gọi bất kỳ sub-scorer nào, hệ thống kiểm tra: <code>audio_duration &lt; 0.5s</code> → reject; <code>transcript == ""</code> → retry; <code>asr_confidence &lt; 0.4</code> → retry. Các case này không đưa vào scoring và không tính vào <code>attempt_count</code>.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S2 ══════════════════════════════════ -->
+<section class="section" id="s2">
+  <div class="section-label">// 02</div>
+  <h2>Text Normalization <span class="accent">Pipeline</span></h2>
+
+  <p>Áp dụng cho mọi sub-scorer sử dụng ASR (NAM, CMD Mode 2, SEN). CMD Mode 1 không cần normalize vì không dùng ASR.</p>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span><span class="file">scoring_engine/normalize.py</span></div>
+    <pre>
+<span class="kw">import</span> unicodedata
+<span class="kw">import</span> re
+
+<span class="kw">def</span> <span class="fn">normalize</span>(text: <span class="var">str</span>) -> <span class="var">str</span>:
+    <span class="cmt"># 1. Unicode NFC — chuẩn hóa dấu tiếng Việt (precomposed form)</span>
+    text = unicodedata.<span class="fn">normalize</span>(<span class="str">"NFC"</span>, text)
+
+    <span class="cmt"># 2. Lowercase</span>
+    text = text.<span class="fn">lower</span>()
+
+    <span class="cmt"># 3. Strip punctuation: xóa .,!?… nhưng GIỮ dấu tiếng Việt</span>
+    text = re.<span class="fn">sub</span>(<span class="str">r"[^\w\s]"</span>, <span class="str">""</span>, text, flags=re.UNICODE)
+
+    <span class="cmt"># 4. Collapse whitespace</span>
+    text = re.<span class="fn">sub</span>(<span class="str">r"\s+"</span>, <span class="str">" "</span>, text).<span class="fn">strip</span>()
+
+    <span class="kw">return</span> text
+</pre>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Input</th><th>Output</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td><code>"Cái Kéo!"</code></td><td><code>"cái kéo"</code></td><td>Lowercase + strip punct</td></tr>
+        <tr><td><code>"Tôi đang uống nước."</code></td><td><code>"tôi đang uống nước"</code></td><td>Strip punct, giữ dấu</td></tr>
+        <tr><td><code>"tôi  ăn  cơm"</code></td><td><code>"tôi ăn cơm"</code></td><td>Collapse whitespace</td></tr>
+        <tr><td><code>"UỐNG NƯỚC"</code></td><td><code>"uống nước"</code></td><td>Lowercase unicode</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-blue">
+    <p><strong>accepted_answers:</strong> Mỗi vocab trong Asset.xlsx có <code>accepted_answers</code> lưu dạng pipe-separated string (<code>"kéo|cây kéo|cái kéo"</code>). Khi scoring, parse thành list và normalize từng phần tử. Keyword match kiểm tra transcript đã normalize có chứa bất kỳ answer nào trong list này không.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S3 ══════════════════════════════════ -->
+<section class="section" id="s3">
+  <div class="section-label">// 03</div>
+  <h2>NAM — <span class="accent">Naming Score</span></h2>
+
+  <p>Bệnh nhân nhìn ảnh → nói tên đồ vật. Trọng tâm là từ khóa chính có xuất hiện không, và có kèm loại từ đúng không. Target so sánh là <code>canonical_word</code> trong Vocabulary Asset.</p>
+
+  <div class="formula-card fc-green">
+    <div class="fc-title">// naming_score formula</div>
+    <div class="fc-formula">
+      score <span class="op2">=</span>
+      <span class="num2">0.50</span> <span class="op2">×</span> <span class="var2">keyword_match</span>
+      <span class="op2">+</span> <span class="num2">0.25</span> <span class="op2">×</span> <span class="var2">text_similarity</span>
+      <span class="op2">+</span> <span class="num2">0.15</span> <span class="op2">×</span> <span class="var2">fluency</span>
+      <span class="op2">+</span> <span class="num2">0.10</span> <span class="op2">×</span> <span class="var2">classifier_present</span>
+    </div>
+    <div class="fc-components">
+      <div class="fc-comp">
+        <div class="fc-name">keyword_match · 50%</div>
+        <div class="fc-desc">100 nếu transcript chứa bất kỳ answer nào trong <code>accepted_answers</code>. 0 nếu không có.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">text_similarity · 25%</div>
+        <div class="fc-desc">Levenshtein ratio giữa transcript normalize và <code>canonical_word</code> normalize × 100.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">fluency · 15%</div>
+        <div class="fc-desc">Duration ratio bệnh nhân / TTS. Xem Section 07.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">classifier_present · 10%</div>
+        <div class="fc-desc">100 nếu transcript chứa loại từ nằm trong <code>accepted_classifiers</code> của chính vocab đó. 0 nếu không có hoặc dùng sai loại từ.</div>
+      </div>
+    </div>
+    <div class="fc-note">Trọng số keyword_match = 50% vì Naming đo khả năng gọi đúng tên — đây là mục tiêu lâm sàng chính của bài. Text_similarity hỗ trợ credit partial khi bệnh nhân gần đúng âm.</div>
+  </div>
+
+  <h3><span class="dot dot-green"></span>Classifier Lookup — dùng <code>accepted_classifiers</code></h3>
+  <p>Classifier check dựa trên field <code>accepted_classifiers</code> được định nghĩa riêng cho từng vocab trong Asset. Chỉ chấp nhận loại từ nằm trong danh sách classifier đúng của vocab đó — loại từ tồn tại nhưng sai ngữ nghĩa (vd "tờ" cho "kéo") không được tính.</p>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span></div>
+    <pre>
+<span class="cmt"># accepted_classifiers lưu trong Asset.xlsx → Vocabulary</span>
+<span class="cmt"># Ví dụ V001 "cái kéo" → accepted_classifiers = "cái|cây"</span>
+
+<span class="kw">def</span> <span class="fn">check_classifier</span>(transcript: <span class="var">str</span>, accepted_classifiers: <span class="var">list</span>[<span class="var">str</span>]) -> <span class="var">float</span>:
+    <span class="kw">if not</span> accepted_classifiers:
+        <span class="kw">return</span> <span class="num">100.0</span>  <span class="cmt"># vocab không yêu cầu classifier (verb/adj) → không phạt</span>
+    words = transcript.<span class="fn">split</span>()
+    <span class="cmt"># Chỉ chấp nhận classifier ĐÚNG với vocab này</span>
+    <span class="kw">return</span> <span class="num">100.0</span> <span class="kw">if any</span>(c <span class="kw">in</span> words <span class="kw">for</span> c <span class="kw">in</span> accepted_classifiers) <span class="kw">else</span> <span class="num">0.0</span>
+</pre>
+  </div>
+
+  <h3><span class="dot dot-green"></span>Ví dụ — vocab V001 "cái kéo" (accepted_classifiers: cái|cây)</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Transcript</th><th>keyword</th><th>similarity</th><th>fluency</th><th>classifier</th><th>Score</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>"cái kéo"</code></td><td>100</td><td>100</td><td>80</td><td>100</td><td><strong>97</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"kéo"</code></td><td>100</td><td>62</td><td>70</td><td>0</td><td><strong>76.5</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"tờ kéo"</code></td><td>100</td><td>71</td><td>80</td><td>0</td><td><strong>75.75</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"cái bát"</code></td><td>0</td><td>42</td><td>75</td><td>100</td><td><strong>31.8</strong></td><td><span class="badge b-red">RETRY</span></td></tr>
+        <tr><td><code>"cái kẹo"</code></td><td>0</td><td>88</td><td>78</td><td>100</td><td><strong>43.7</strong></td><td><span class="badge b-red">RETRY</span></td></tr>
+        <tr><td><code>"con chó"</code></td><td>0</td><td>20</td><td>72</td><td>0</td><td><strong>14.4</strong></td><td><span class="badge b-red">RETRY</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout callout-green">
+    <p><strong>Trường hợp "tờ kéo":</strong> "tờ" không nằm trong <code>accepted_classifiers = [cái, cây]</code> của "cái kéo" → classifier = 0 → tổng 75.75. Vẫn PASS (vì keyword "kéo" đúng) nhưng thấp hơn "cái kéo" (97) — phản ánh đúng việc dùng sai loại từ.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S4 ══════════════════════════════════ -->
+<section class="section" id="s4">
+  <div class="section-label">// 04</div>
+  <h2>CMD Mode 1 — <span class="accent">Recognition (Correct / Incorrect)</span></h2>
+
+  <p>Bệnh nhân nghe mô tả âm thanh → chọn đáp án đúng bằng touch (4 options). Hoàn toàn không dùng ASR. Đây là bài tập kiểm tra khả năng <strong>thông hiểu thính giác</strong>, không đo phát âm.</p>
+
+  <div class="formula-card fc-blue">
+    <div class="fc-title">// cmd_recognition — KHÔNG tính điểm số</div>
+    <div class="fc-formula">
+      result <span class="op2">=</span>
+      <span class="var2">CORRECT</span> &nbsp;<span class="op2">if</span>&nbsp; <span class="var2">selected_vocab_id</span> <span class="op2">==</span> <span class="var2">target_vocab_id</span>
+      &nbsp;<span class="op2">else</span>&nbsp; <span class="var2">INCORRECT</span>
+    </div>
+    <div class="fc-note">CMD Mode 1 KHÔNG sinh score 0–100. Bài touch chỉ có 2 trạng thái: Correct / Incorrect. Không có partial credit, không có Near. CORRECT được tính như một "bài đúng" trong chuỗi progression (xem Section 09); INCORRECT reset chuỗi.</div>
+  </div>
+
+  <div class="callout callout-blue">
+    <p><strong>Tại sao không tính điểm?</strong> CMD Recognition bản chất là bài trắc nghiệm thông hiểu — không có gì để chấm điểm từng phần. Việc ép nó vào thang 0–100 là gượng ép. Hiển thị Correct/Incorrect trung thực hơn với bản chất bài, và vẫn tham gia bình thường vào progression rule (đếm số bài đúng liên tiếp).</p>
+  </div>
+
+  <h3><span class="dot dot-blue"></span>Input & Output của CMD Mode 1</h3>
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span><span class="file">scoring_engine/cmd_recognition.py</span></div>
+    <pre>
+<span class="kw">def</span> <span class="fn">evaluate_cmd_recognition</span>(
+    exercise: <span class="var">Exercise</span>,
+    selected_vocab_id: <span class="var">str</span>  <span class="cmt"># ID vocab bệnh nhân tap chọn, từ frontend</span>
+) -> <span class="var">RecognitionResult</span>:
+
+    is_correct = (selected_vocab_id == exercise.target_vocab_id)
+
+    <span class="kw">return</span> <span class="var">RecognitionResult</span>(
+        result      = <span class="str">"correct"</span> <span class="kw">if</span> is_correct <span class="kw">else</span> <span class="str">"incorrect"</span>,
+        score       = <span class="kw">None</span>,   <span class="cmt"># KHÔNG có điểm số</span>
+        selected_id = selected_vocab_id,
+        is_correct  = is_correct,
+        <span class="cmt"># Tham gia progression: correct → +1 streak, incorrect → reset</span>
+        counts_for_progression = <span class="kw">True</span>,
+    )
+</pre>
+  </div>
+
+  <h3><span class="dot dot-blue"></span>Distractor Requirement</h3>
+  <p>CMD Mode 1 yêu cầu field <code>distractor_vocab_ids</code> trong Exercise schema — danh sách 3 vocab cùng topic nhưng sai để hiển thị 4 options. Backend chọn ngẫu nhiên 3 từ cùng topic và level khi không có distractor cố định.</p>
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">json</span><span class="file">exercise_schema / CMD Mode 1</span></div>
+    <pre>
+{
+  <span class="str">"exercise_id"</span>:          <span class="str">"CMD001"</span>,
+  <span class="str">"exercise_type"</span>:        <span class="str">"command_identification"</span>,
+  <span class="str">"target_vocab_id"</span>:      <span class="str">"V001"</span>,
+  <span class="str">"mode"</span>:                 <span class="str">"recognition"</span>,
+  <span class="str">"distractor_vocab_ids"</span>: [<span class="str">"V002"</span>, <span class="str">"V003"</span>, <span class="str">"V004"</span>],  <span class="cmt">// required</span>
+  <span class="str">"suitable_profiles"</span>:    [<span class="str">"wernicke_like"</span>, <span class="str">"mixed"</span>, <span class="str">"broca_like"</span>]
+}
+</pre>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S5 ══════════════════════════════════ -->
+<section class="section" id="s5">
+  <div class="section-label">// 05</div>
+  <h2>CMD Mode 2 — <span class="accent">Repetition Score</span></h2>
+
+  <p>Bệnh nhân nghe mô tả + nhìn ảnh target → nói tên từ. Giống Naming nhưng bệnh nhân đã có <strong>2 cue đồng thời</strong> (nghe audio mô tả + thấy ảnh) trước khi nói. Vì đã nghe đáp án nên khả năng cao bệnh nhân sẽ nói đúng từ khóa — do đó điểm phân biệt thực sự nằm ở <strong>sự hoàn thiện của đáp án</strong> (text_similarity + classifier), không phải ở keyword.</p>
+
+  <div class="formula-card fc-purple">
+    <div class="fc-title">// cmd_repetition_score formula</div>
+    <div class="fc-formula">
+      score <span class="op2">=</span>
+      <span class="num2">0.40</span> <span class="op2">×</span> <span class="var2">keyword_match</span>
+      <span class="op2">+</span> <span class="num2">0.30</span> <span class="op2">×</span> <span class="var2">text_similarity</span>
+      <span class="op2">+</span> <span class="num2">0.20</span> <span class="op2">×</span> <span class="var2">classifier_present</span>
+      <span class="op2">+</span> <span class="num2">0.10</span> <span class="op2">×</span> <span class="var2">fluency</span>
+    </div>
+    <div class="fc-components">
+      <div class="fc-comp">
+        <div class="fc-name">keyword_match · 40%</div>
+        <div class="fc-desc">Giảm so với NAM — vì đã nghe cue nên nói đúng keyword gần như là baseline, không còn là điểm phân biệt chính.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">text_similarity · 30%</div>
+        <div class="fc-desc">Tăng — đánh vào độ hoàn thiện về âm/từ của đáp án sau khi đã nghe mẫu.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">classifier_present · 20%</div>
+        <div class="fc-desc">Cao hơn NAM (10%) — đã có đủ cue mà vẫn thiếu loại từ là lỗi đáng chú ý hơn. Dùng <code>accepted_classifiers</code> như NAM.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">fluency · 10%</div>
+        <div class="fc-desc">Duration ratio. Giảm xuống 10% vì bài ngắn (1–2 từ), ít có ý nghĩa phân biệt.</div>
+      </div>
+    </div>
+    <div class="fc-note">Triết lý: đã nghe đáp án → keyword là điều kiện gần như mặc định. Điểm phân biệt chuyển sang text_similarity + classifier (tổng 50%) để đo mức độ hoàn thiện của đáp án sau khi được hỗ trợ.</div>
+  </div>
+
+  <h3><span class="dot dot-purple"></span>So sánh NAM vs CMD Mode 2</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Thành phần</th><th>NAM</th><th>CMD Mode 2</th><th>Lý do khác biệt</th></tr></thead>
+      <tbody>
+        <tr><td>keyword_match</td><td>50%</td><td>40%</td><td>CMD Mode 2 đã nghe cue → keyword là baseline, không phải điểm phân biệt</td></tr>
+        <tr><td>text_similarity</td><td>25%</td><td>30%</td><td>Tăng — nhấn vào hoàn thiện âm/từ sau khi nghe mẫu</td></tr>
+        <tr><td>classifier_present</td><td>10%</td><td>20%</td><td>Tăng — đã đủ cue mà thiếu loại từ là lỗi nặng hơn</td></tr>
+        <tr><td>fluency</td><td>15%</td><td>10%</td><td>Giảm — bài ngắn, ít ý nghĩa phân biệt</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S6 ══════════════════════════════════ -->
+<section class="section" id="s6">
+  <div class="section-label">// 06</div>
+  <h2>SEN — <span class="accent">Sentence Building Score</span></h2>
+
+  <p>Bệnh nhân nhìn câu khuyết + ảnh → nói đủ câu hoàn chỉnh. Ví dụ: câu "<strong>Tôi đang ___</strong>" + ảnh mô tả hành động ăn cơm → bệnh nhân phải nói được "tôi đang ăn cơm". Mục tiêu tối thiểu: <strong>nhận diện được hành động và nói ra từ khuyết</strong>, kèm cấu trúc câu phù hợp. Target là <code>full_sentence</code> trong Sentence Instance Asset.</p>
+
+
+  <div class="formula-card fc-teal">
+    <div class="fc-title">// sentence_score formula (attempt 1 — chưa nghe fallback audio)</div>
+    <div class="fc-formula">
+      score <span class="op2">=</span>
+      <span class="num2">0.40</span> <span class="op2">×</span> <span class="var2">keyword</span>
+      <span class="op2">+</span> <span class="num2">0.50</span> <span class="op2">×</span> <span class="var2">order_score</span>
+      <span class="op2">+</span> <span class="num2">0.10</span> <span class="op2">×</span> <span class="var2">fluency</span>
+    </div>
+    <div class="fc-components">
+      <div class="fc-comp">
+        <div class="fc-name">keyword · 40%</div>
+        <div class="fc-desc">Phần từ khuyết (vd "ăn cơm") có được nói đủ không. Đo mục tiêu chính: nhận diện hành động.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">order_score · 50%</div>
+        <div class="fc-desc">Thứ tự từ toàn câu. Đo cấu trúc câu — điểm phân biệt chính của bài "xây câu" so với "gọi tên".</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">fluency · 10%</div>
+        <div class="fc-desc">Duration ratio. Giữ thấp — không phạt nặng bệnh nhân nói chậm (đặc trưng aphasia).</div>
+      </div>
+    </div>
+    <div class="fc-note">order_score = 50% (nặng nhất) vì cấu trúc câu là mục tiêu cốt lõi. keyword = 40% nhấn mạnh việc nhận ra từ khuyết. Hai thành phần này phối hợp: keyword đo "đủ từ khuyết", order đo "đúng thứ tự toàn câu".</div>
+  </div>
+
+  <h3><span class="dot dot-teal"></span>keyword — Phần từ khuyết</h3>
+  <p>Phần từ khuyết được lưu trong field riêng của Sentence Instance (do người làm exercise bank bổ sung — lưu chính xác phần bị che trong câu). keyword chỉ đo <strong>có nói đủ từ khuyết không</strong>, không xét thứ tự (thứ tự để order_score lo).</p>
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span></div>
+    <pre>
+<span class="kw">from</span> underthesea <span class="kw">import</span> word_tokenize
+
+<span class="kw">def</span> <span class="fn">keyword_score</span>(transcript: <span class="var">str</span>, missing_words: <span class="var">list</span>[<span class="var">str</span>]) -> <span class="var">float</span>:
+    <span class="cmt"># missing_words = phần khuyết trong câu, vd ["ăn", "cơm"]</span>
+    <span class="kw">if not</span> missing_words:
+        <span class="kw">return</span> <span class="num">100.0</span>
+    trans_tokens = <span class="fn">set</span>(word_tokenize(<span class="fn">normalize</span>(transcript)))
+    matched = [w <span class="kw">for</span> w <span class="kw">in</span> missing_words <span class="kw">if</span> w <span class="kw">in</span> trans_tokens]
+    <span class="kw">return</span> <span class="fn">len</span>(matched) / <span class="fn">len</span>(missing_words) * <span class="num">100</span>
+</pre>
+  </div>
+
+  <h3><span class="dot dot-teal"></span>order_score — Thuật toán thứ tự từ</h3>
+  <p>Duyệt từng từ của target theo thứ tự, tìm <strong>vị trí đầu tiên</strong> của nó trong câu bệnh nhân. Phân loại mỗi từ target thành: đúng vị trí / sai vị trí / thiếu. Từ target đầu tiên luôn là mốc (đúng vị trí).</p>
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span></div>
+    <pre>
+<span class="kw">def</span> <span class="fn">order_score</span>(transcript: <span class="var">str</span>, target: <span class="var">str</span>) -> <span class="var">float</span>:
+    target_seq = word_tokenize(<span class="fn">normalize</span>(target))
+    trans_seq  = word_tokenize(<span class="fn">normalize</span>(transcript))
+
+    correct, misplaced, missing = <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>
+    last_pos = -<span class="num">1</span>  <span class="cmt"># vị trí của từ target trước đó trong câu bệnh nhân</span>
+
+    <span class="kw">for</span> word <span class="kw">in</span> target_seq:
+        <span class="cmt"># tìm vị trí ĐẦU TIÊN của word trong câu bệnh nhân</span>
+        pos = trans_seq.<span class="fn">index</span>(word) <span class="kw">if</span> word <span class="kw">in</span> trans_seq <span class="kw">else</span> <span class="kw">None</span>
+
+        <span class="kw">if</span> pos <span class="kw">is</span> <span class="kw">None</span>:
+            missing += <span class="num">1</span>                     <span class="cmt"># không tìm thấy → thiếu</span>
+        <span class="kw">elif</span> last_pos == -<span class="num">1</span> <span class="kw">or</span> pos > last_pos:
+            correct += <span class="num">1</span>                     <span class="cmt"># từ đầu tiên, hoặc đứng sau từ trước → đúng vị trí</span>
+            last_pos = pos
+        <span class="kw">else</span>:
+            misplaced += <span class="num">1</span>                   <span class="cmt"># xuất hiện trước từ lẽ ra đứng trước → sai vị trí</span>
+
+    total = <span class="fn">len</span>(target_seq)
+    <span class="kw">if</span> total == <span class="num">0</span>:
+        <span class="kw">return</span> <span class="num">100.0</span>
+
+    <span class="cmt"># đúng ăn full, sai vị trí ăn nửa điểm, thiếu = 0</span>
+    <span class="kw">return</span> (correct * <span class="num">1.0</span> + misplaced * <span class="num">0.5</span>) / total * <span class="num">100</span>
+</pre>
+  </div>
+  <div class="callout callout-green">
+    <p><strong>Logic cộng điểm:</strong> đúng vị trí ×1.0, sai vị trí ×0.5 (vì dù sao cũng nói được từ đó), thiếu ×0. Mẫu số là tổng số từ target → từ thiếu tự động bị phạt qua mẫu số. Cách này phạt "thiếu từ" nặng hơn "sai vị trí", đúng với trực giác lâm sàng.</p>
+  </div>
+
+  <h3><span class="dot dot-teal"></span>fluency</h3>
+  <p>Giống các bài khác — duration ratio audio bệnh nhân so với TTS chuẩn. Xem Section 07.</p>
+
+  <h3><span class="dot dot-teal"></span>Bảng test — SI "Tôi đang ăn cơm", từ khuyết "ăn cơm"</h3>
+  <p>keyword = (từ khuyết khớp / 2)×100 · order theo công thức trên · ngưỡng PASS≥70 / NEAR 50–69 / RETRY&lt;50</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Transcript</th><th>đúng/sai/thiếu</th><th>keyword</th><th>order</th><th>flu</th><th>Score</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>"tôi đang ăn cơm"</code></td><td>4/0/0</td><td>100</td><td>100</td><td>90</td><td><strong>99.0</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"tôi đang cơm ăn"</code></td><td>3/1/0</td><td>100</td><td>87.5</td><td>85</td><td><strong>92.25</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"tôi ăn cơm"</code></td><td>3/0/1</td><td>100</td><td>75</td><td>85</td><td><strong>86.0</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"tôi ăn cơm đang"</code></td><td>2/2/0</td><td>100</td><td>75</td><td>80</td><td><strong>85.5</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"cơm ăn đang tôi"</code></td><td>1/3/0</td><td>100</td><td>62.5</td><td>80</td><td><strong>79.25</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"tôi cơm ăn"</code></td><td>2/1/1</td><td>100</td><td>62.5</td><td>80</td><td><strong>79.25</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"ăn cơm"</code></td><td>2/0/2</td><td>100</td><td>50</td><td>80</td><td><strong>73.0</strong></td><td><span class="badge b-green">PASS</span></td></tr>
+        <tr><td><code>"tôi đang ăn"</code></td><td>3/0/1</td><td>50</td><td>75</td><td>80</td><td><strong>65.5</strong></td><td><span class="badge b-yellow">NEAR</span></td></tr>
+        <tr><td><code>"tôi ăn"</code></td><td>1/0/3</td><td>50</td><td>25</td><td>80</td><td><strong>40.5</strong></td><td><span class="badge b-red">RETRY</span></td></tr>
+        <tr><td><code>"tôi đang đi học"</code></td><td>2/0/2</td><td>0</td><td>50</td><td>85</td><td><strong>33.5</strong></td><td><span class="badge b-red">RETRY</span></td></tr>
+        <tr><td><code>"đi học"</code></td><td>0/0/4</td><td>0</td><td>0</td><td>80</td><td><strong>8.0</strong></td><td><span class="badge b-red">RETRY</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout callout-yellow">
+    <p><strong>Đặc điểm thang điểm:</strong> Câu nói đủ từ khuyết (keyword=100) luôn ≥73 và PASS, kể cả khi đảo thứ tự — phản ánh ưu tiên "nhận ra hành động". Câu thiếu từ khuyết (keyword=50) rơi NEAR. Câu sai hành động hoàn toàn (keyword=0) luôn RETRY dù có nói đúng "tôi đang". Thang điểm giãn từ 8 đến 99.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S7 ══════════════════════════════════ -->
+<section class="section" id="s7">
+  <div class="section-label">// 07</div>
+  <h2>Fluency <span class="accent">Component</span></h2>
+
+  <p>Dùng chung cho NAM, CMD Mode 2, và SEN. So sánh thời lượng audio bệnh nhân với thời lượng chuẩn của TTS pre-generated cho bài đó.</p>
+
+  <div class="formula-card fc-yellow">
+    <div class="fc-title">// fluency_score formula</div>
+    <div class="fc-formula">
+      ratio <span class="op2">=</span> <span class="fn">min</span>(<span class="var2">actual_dur</span>, <span class="var2">expected_dur</span>) <span class="op2">/</span> <span class="fn">max</span>(<span class="var2">actual_dur</span>, <span class="var2">expected_dur</span>)<br>
+      fluency_score <span class="op2">=</span> ratio <span class="op2">×</span> <span class="num2">100</span> &nbsp;<span class="op2">if</span>&nbsp; ratio <span class="op2">≥</span> <span class="num2">0.5</span> &nbsp;<span class="op2">else</span>&nbsp; <span class="num2">0</span>
+    </div>
+    <div class="fc-components">
+      <div class="fc-comp">
+        <div class="fc-name">actual_dur</div>
+        <div class="fc-desc">Thời lượng audio bệnh nhân (giây), từ AudioInput module. Tối đa 10s.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">expected_dur</div>
+        <div class="fc-desc">Field <code>duration_expected</code> trong Exercise schema, lấy từ TTS pre-generated.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">ngưỡng 0.5</div>
+        <div class="fc-desc">Nếu ratio &lt; 0.5 → bệnh nhân nói quá nhanh hoặc quá chậm → fluency = 0, không phạt toàn bộ score.</div>
+      </div>
+    </div>
+    <div class="fc-note">Fluency chỉ chiếm 10–20% tổng score. Bệnh nhân nói đúng nhưng chậm sẽ bị giảm fluency nhẹ, không bị fail toàn bài. Đây là thiết kế có chủ ý — aphasia thường gây chậm, không nên phạt nặng yếu tố này.</div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span></div>
+    <pre>
+<span class="kw">def</span> <span class="fn">fluency_score</span>(actual_dur: <span class="var">float</span>, expected_dur: <span class="var">float</span>) -> <span class="var">float</span>:
+    <span class="kw">if</span> expected_dur <= <span class="num">0</span> <span class="kw">or</span> actual_dur <= <span class="num">0</span>:
+        <span class="kw">return</span> <span class="num">70.0</span>  <span class="cmt"># fallback nếu thiếu data</span>
+    ratio = <span class="fn">min</span>(actual_dur, expected_dur) / <span class="fn">max</span>(actual_dur, expected_dur)
+    <span class="kw">return</span> ratio * <span class="num">100</span> <span class="kw">if</span> ratio >= <span class="num">0.5</span> <span class="kw">else</span> <span class="num">0.0</span>
+</pre>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Tình huống</th><th>actual / expected</th><th>ratio</th><th>fluency_score</th></tr></thead>
+      <tbody>
+        <tr><td>Nói đúng tốc độ chuẩn</td><td>2.0s / 2.0s</td><td>1.00</td><td><span class="badge b-green">100</span></td></tr>
+        <tr><td>Nói chậm hơn chuẩn 30%</td><td>2.6s / 2.0s</td><td>0.77</td><td><span class="badge b-green">77</span></td></tr>
+        <tr><td>Nói chậm hơn chuẩn 50%</td><td>3.0s / 2.0s</td><td>0.67</td><td><span class="badge b-yellow">67</span></td></tr>
+        <tr><td>Nói rất chậm (×2)</td><td>4.0s / 2.0s</td><td>0.50</td><td><span class="badge b-yellow">50</span></td></tr>
+        <tr><td>Nói quá chậm (&gt;×2)</td><td>5.0s / 2.0s</td><td>0.40</td><td><span class="badge b-red">0</span></td></tr>
+        <tr><td>Nói quá nhanh (&lt;×0.5)</td><td>0.8s / 2.0s</td><td>0.40</td><td><span class="badge b-red">0</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S8 ══════════════════════════════════ -->
+<section class="section" id="s8">
+  <div class="section-label">// 08</div>
+  <h2>Result Classification — <span class="accent">Pass / Near / Retry</span></h2>
+
+  <p>Sau khi tính score, Rule Engine phân loại kết quả và quyết định hành động tiếp theo. Ngưỡng phân loại giống nhau cho tất cả exercise type (trừ CMD Mode 1 — xem bên dưới).</p>
+
+  <div class="result-row">
+    <div class="result-card rc-pass">
+      <div class="rc-label">PASS</div>
+      <div class="rc-range">≥ 70</div>
+      <div class="rc-desc">Chuyển bài tiếp theo. Cộng vào <code>correct_streak</code>. Phát feedback tích cực.</div>
+    </div>
+    <div class="result-card rc-near">
+      <div class="rc-label">NEAR</div>
+      <div class="rc-range">50 – 69</div>
+      <div class="rc-desc">Phát TTS chậm 0.75×. Cho phép thử lại (tối đa 3 lần). Reset <code>correct_streak</code>.</div>
+    </div>
+    <div class="result-card rc-retry">
+      <div class="rc-label">RETRY</div>
+      <div class="rc-range">&lt; 50</div>
+      <div class="rc-desc">Phát TTS 0.6×. Nếu đã 3 lần → skip + log. Reset <code>correct_streak</code>.</div>
+    </div>
+  </div>
+
+  <h3><span class="dot dot-blue"></span>CMD Mode 1 — Correct / Incorrect</h3>
+  <p>CMD Mode 1 không có score nên không dùng thang Pass/Near/Retry. Chỉ có 2 trạng thái, ánh xạ trực tiếp vào progression:</p>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span></div>
+    <pre>
+<span class="kw">def</span> <span class="fn">classify_cmd_recognition</span>(is_correct: <span class="var">bool</span>) -> <span class="var">str</span>:
+    <span class="kw">return</span> <span class="str">"correct"</span> <span class="kw">if</span> is_correct <span class="kw">else</span> <span class="str">"incorrect"</span>
+    <span class="cmt"># correct → tính như 1 bài đúng trong chuỗi progression</span>
+    <span class="cmt"># incorrect → reset chuỗi, hiển thị đáp án đúng, không cho thử lại</span>
+</pre>
+  </div>
+
+  <h3><span class="dot dot-orange"></span>Attempt Limit</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Exercise Type</th><th>Max attempts</th><th>Hành động khi hết attempt</th></tr></thead>
+      <tbody>
+        <tr><td>NAM, CMD Mode 2, SEN</td><td>3 lần</td><td>Skip bài, phát TTS chuẩn, log <code>result=skip</code></td></tr>
+        <tr><td>CMD Mode 1</td><td>1 lần</td><td>Hiển thị đáp án đúng ngay, không retry</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S9 ══════════════════════════════════ -->
+<section class="section" id="s9">
+  <div class="section-label">// 09</div>
+  <h2>Progression Rule & <span class="accent">Level-up Logic</span></h2>
+
+  <p>Vocab level là cơ chế <strong>tăng độ khó từ vựng dần trong một buổi luyện tập</strong>. Nó <strong>không</strong> phải trạng thái lưu lâu dài của bệnh nhân.</p>
+
+  <div class="callout callout-yellow">
+    <p><strong>Vocab level chỉ tồn tại trong session:</strong> Mỗi session bắt đầu ở Level 1. Trong session, cứ <strong>3 bài đúng liên tiếp cùng topic</strong> thì vocab level tăng 1 (có thể lên nhiều lần trong cùng session). <strong>Hết session (làm xong 10 bài) → vocab level reset về 1</strong> cho buổi sau. Đây là adaptive difficulty trong buổi, không phải xếp hạng năng lực dài hạn.</p>
+  </div>
+
+  <h3><span class="dot dot-green"></span>Định nghĩa "đúng" — gộp chung mọi exercise type</h3>
+  <p>Level up tính trên <strong>cùng topic</strong>, không phân biệt exercise type. Một bài được coi là "đúng" khi:</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Exercise type</th><th>Điều kiện "đúng" (tính vào streak)</th></tr></thead>
+      <tbody>
+        <tr><td>NAM</td><td>score ≥ 70 (PASS)</td></tr>
+        <tr><td>CMD Mode 1 (Recognition)</td><td>result == Correct</td></tr>
+        <tr><td>CMD Mode 2 (Repetition)</td><td>score ≥ 70 (PASS)</td></tr>
+        <tr><td>SEN</td><td>score ≥ 70 (PASS)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span><span class="file">rule_engine/progression.py</span></div>
+    <pre>
+<span class="cmt"># correct_streak: số bài ĐÚNG liên tiếp trong cùng topic, trong session hiện tại</span>
+<span class="cmt"># vocab_level reset = 1 ở đầu mỗi session</span>
+
+<span class="kw">def</span> <span class="fn">is_correct</span>(result, exercise_type) -> <span class="var">bool</span>:
+    <span class="kw">if</span> exercise_type == <span class="str">"cmd_recognition"</span>:
+        <span class="kw">return</span> result == <span class="str">"correct"</span>      <span class="cmt"># CMD Mode 1: Correct/Incorrect</span>
+    <span class="kw">return</span> result == <span class="str">"pass"</span>              <span class="cmt"># speech: score ≥ 70</span>
+
+<span class="kw">def</span> <span class="fn">update_vocab_level</span>(
+    result: <span class="var">str</span>,
+    exercise_type: <span class="var">str</span>,
+    vocab_level: <span class="var">int</span>,      <span class="cmt"># level hiện tại trong session (1-3)</span>
+    correct_streak: <span class="var">int</span>   <span class="cmt"># số bài đúng liên tiếp cùng topic</span>
+) -> <span class="var">ProgressionUpdate</span>:
+
+    <span class="kw">if</span> <span class="fn">is_correct</span>(result, exercise_type):
+        correct_streak += <span class="num">1</span>
+    <span class="kw">else</span>:
+        correct_streak = <span class="num">0</span>      <span class="cmt"># sai/incorrect/near → reset chuỗi</span>
+
+    <span class="cmt"># 3 bài đúng liên tiếp → lên 1 level (tối đa level 3)</span>
+    <span class="kw">if</span> correct_streak >= <span class="num">3</span> <span class="kw">and</span> vocab_level < <span class="num">3</span>:
+        <span class="kw">return</span> <span class="var">ProgressionUpdate</span>(
+            vocab_level    = vocab_level + <span class="num">1</span>,
+            correct_streak = <span class="num">0</span>,           <span class="cmt"># reset streak sau khi lên level</span>
+            action         = <span class="str">"level_up"</span>
+        )
+
+    <span class="kw">return</span> <span class="var">ProgressionUpdate</span>(
+        vocab_level    = vocab_level,
+        correct_streak = correct_streak,
+        action         = <span class="str">"hold"</span>
+    )
+
+<span class="kw">def</span> <span class="fn">on_session_end</span>():
+    <span class="cmt"># Reset vocab_level và streak về mặc định cho session sau</span>
+    vocab_level    = <span class="num">1</span>
+    correct_streak = <span class="num">0</span>
+</pre>
+  </div>
+
+  <h3><span class="dot dot-green"></span>Sơ đồ trạng thái trong 1 session</h3>
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">text</span><span class="file">in-session vocab level flow</span></div>
+    <pre>
+  SESSION START
+       │
+       ▼
+  vocab_level = 1, correct_streak = 0
+       │
+       ├──► bài ĐÚNG (bất kỳ type, cùng topic) ──► correct_streak += 1
+       │                                              │
+       │                                              ▼
+       │                                    correct_streak == 3 ?
+       │                                       │            │
+       │                                      yes          no
+       │                                       │            │
+       │                          vocab_level += 1      tiếp tục
+       │                          correct_streak = 0
+       │                          (tối đa level 3)
+       │
+       ├──► bài SAI / incorrect / near ──► correct_streak = 0
+       │
+       ▼
+  Làm đủ 10 bài → SESSION END
+       │
+       ▼
+  RESET: vocab_level = 1, correct_streak = 0  (cho session sau)
+</pre>
+  </div>
+
+  <div class="callout callout-green">
+    <p><strong>Tóm tắt:</strong> không phân biệt loại bài — cứ 3 bài đúng liên tiếp cùng topic là vocab level của topic đó tăng trong session. CMD Mode 1 (Correct) tính như mọi bài đúng khác. Không có level-down, không có baseline calibration — vì level chỉ sống trong session và reset mỗi buổi.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S10 ══════════════════════════════════ -->
+<section class="section" id="s10">
+  <div class="section-label">// 10</div>
+  <h2>Vocab Level <span class="accent">Difficulty Weighting</span></h2>
+
+  <p>Vocab Level (1–2–3) — chính là level từ vựng <strong>tại thời điểm làm bài</strong> trong session (cơ chế tăng dần độ khó ở Section 09) — được dùng để tính <code>difficulty_weighted_score</code>, một chỉ số riêng phục vụ SLP Dashboard. Nó không ảnh hưởng đến <code>raw_score</code> và không ảnh hưởng đến progression.</p>
+
+  <div class="callout callout-blue">
+    <p><strong>Nguyên tắc tách biệt:</strong> <code>raw_score</code> (0–100) dùng cho progression rule và feedback UI. <code>difficulty_weighted_score</code> chỉ dùng trong SLP dashboard để thể hiện tiến bộ thực chất — một bài đúng ở level 3 (từ khó hơn) có giá trị lâm sàng cao hơn cùng điểm ở level 1. Vì level tăng dần trong session, các bài về sau của buổi (nếu bệnh nhân làm tốt) sẽ có weighted_score cao hơn.</p>
+  </div>
+
+  <div class="formula-card fc-purple">
+    <div class="fc-title">// difficulty_weighted_score</div>
+    <div class="fc-formula">
+      weighted <span class="op2">=</span> <span class="var2">raw_score</span> <span class="op2">×</span> <span class="var2">difficulty_multiplier</span>[<span class="var2">vocab_level</span>]
+    </div>
+    <div class="fc-components">
+      <div class="fc-comp">
+        <div class="fc-name">Level 1 — Easy</div>
+        <div class="fc-desc">multiplier = <strong>1.00</strong>. Từ đơn, danh từ quen thuộc (sách lớp 1–3).</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">Level 2 — Medium</div>
+        <div class="fc-desc">multiplier = <strong>1.15</strong>. Từ ghép đời thường, động từ cơ bản.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">Level 3 — Hard</div>
+        <div class="fc-desc">multiplier = <strong>1.30</strong>. Câu giao tiếp, mệnh đề phức.</div>
+      </div>
+    </div>
+    <div class="fc-note">weighted_score có thể vượt 100. SLP dashboard hiển thị theo thang gốc (vd: "97.5 / 130 max ở level 3") hoặc normalize về 0–100 tùy UI.</div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span></div>
+    <pre>
+<span class="const">DIFFICULTY_MULTIPLIER</span> = {<span class="num">1</span>: <span class="num">1.00</span>, <span class="num">2</span>: <span class="num">1.15</span>, <span class="num">3</span>: <span class="num">1.30</span>}
+
+<span class="kw">def</span> <span class="fn">apply_difficulty_weight</span>(raw_score: <span class="var">float</span>, vocab_level: <span class="var">int</span>) -> <span class="var">float</span>:
+    multiplier = <span class="const">DIFFICULTY_MULTIPLIER</span>.get(vocab_level, <span class="num">1.0</span>)
+    <span class="kw">return</span> <span class="fn">round</span>(raw_score * multiplier, <span class="num">2</span>)
+</pre>
+  </div>
+
+  <h3><span class="dot dot-purple"></span>Ví dụ — cùng raw_score, khác level</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Bài tập</th><th>Level</th><th>raw_score</th><th>multiplier</th><th>weighted_score</th><th>Ý nghĩa SLP</th></tr></thead>
+      <tbody>
+        <tr><td>"cái kéo" (NAM)</td><td><span class="badge b-green">1</span></td><td>75</td><td>×1.00</td><td><strong>75.00</strong></td><td>Baseline</td></tr>
+        <tr><td>"đánh răng" (NAM)</td><td><span class="badge b-yellow">2</span></td><td>75</td><td>×1.15</td><td><strong>86.25</strong></td><td>Tốt hơn level 1</td></tr>
+        <tr><td>"Tôi đang uống nước" (SEN)</td><td><span class="badge b-orange">3</span></td><td>75</td><td>×1.30</td><td><strong>97.50</strong></td><td>Tiến bộ đáng kể</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S11 ══════════════════════════════════ -->
+<section class="section" id="s11">
+  <div class="section-label">// 11</div>
+  <h2>Attempt & Fallback Handling <span class="accent">(SEN)</span></h2>
+
+  <p>Sentence Building có cơ chế fallback riêng: nếu bệnh nhân không đúng, hệ thống phát audio câu hoàn chỉnh để bệnh nhân nghe và lặp lại. Score của attempt 2 (sau fallback) bị giảm bằng multiplier 0.75 để phân biệt với attempt tự làm.</p>
+
+  <div class="formula-card fc-teal">
+    <div class="fc-title">// sentence_building — adjusted score per attempt</div>
+    <div class="fc-formula">
+      adjusted_score <span class="op2">=</span> raw_score <span class="op2">×</span> attempt_multiplier[attempt_number]
+    </div>
+    <div class="fc-components">
+      <div class="fc-comp">
+        <div class="fc-name">attempt 1</div>
+        <div class="fc-desc">multiplier = <strong>1.00</strong>. Bệnh nhân chưa nghe fallback audio. Score nguyên.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">attempt 2</div>
+        <div class="fc-desc">multiplier = <strong>0.75</strong>. Đã nghe full sentence audio. Score giảm 25%.</div>
+      </div>
+      <div class="fc-comp">
+        <div class="fc-name">attempt 3</div>
+        <div class="fc-desc">multiplier = <strong>0.60</strong>. Đã nghe 2 lần. Score giảm 40%. Sau đó skip.</div>
+      </div>
+    </div>
+    <div class="fc-note">adjusted_score là score được log vào database và dùng cho progression rule. Raw score (attempt 1) được lưu riêng để SLP xem nguyên bản.</div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">python</span><span class="file">scoring_engine/sentence_builder.py</span></div>
+    <pre>
+<span class="const">ATTEMPT_MULTIPLIER</span> = {<span class="num">1</span>: <span class="num">1.00</span>, <span class="num">2</span>: <span class="num">0.75</span>, <span class="num">3</span>: <span class="num">0.60</span>}
+
+<span class="kw">def</span> <span class="fn">score_sentence</span>(
+    exercise: <span class="var">Exercise</span>,
+    transcript: <span class="var">str</span>,
+    audio_duration: <span class="var">float</span>,
+    attempt_number: <span class="var">int</span>
+) -> <span class="var">ScoreResult</span>:
+
+    raw = (
+        <span class="num">0.40</span> * <span class="fn">keyword_score</span>(transcript, exercise.missing_words) +
+        <span class="num">0.50</span> * <span class="fn">order_score</span>(transcript, exercise.full_sentence) +
+        <span class="num">0.10</span> * <span class="fn">fluency_score</span>(audio_duration, exercise.duration_expected)
+    )
+
+    multiplier = <span class="const">ATTEMPT_MULTIPLIER</span>.get(attempt_number, <span class="num">0.60</span>)
+    adjusted   = raw * multiplier
+
+    <span class="kw">return</span> <span class="var">ScoreResult</span>(
+        score         = adjusted,
+        raw_score     = raw,
+        attempt       = attempt_number,
+        used_fallback = attempt_number > <span class="num">1</span>,
+        result        = <span class="fn">classify</span>(adjusted),
+        components    = {
+            <span class="str">"keyword"</span>:      ...,
+            <span class="str">"order_score"</span>:  ...,
+            <span class="str">"fluency"</span>:      ...,
+        }
+    )
+</pre>
+  </div>
+
+  <h3><span class="dot dot-teal"></span>Ví dụ — cùng transcript "tôi đang uống nước", khác attempt</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Attempt</th><th>raw_score</th><th>multiplier</th><th>adjusted_score</th><th>Result</th><th>Context</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>92</td><td>×1.00</td><td><strong>92.0</strong></td><td><span class="badge b-green">PASS</span></td><td>Tự nói đúng lần đầu</td></tr>
+        <tr><td>2</td><td>92</td><td>×0.75</td><td><strong>69.0</strong></td><td><span class="badge b-yellow">NEAR</span></td><td>Nói đúng sau khi nghe audio mẫu</td></tr>
+        <tr><td>3</td><td>92</td><td>×0.60</td><td><strong>55.2</strong></td><td><span class="badge b-yellow">NEAR</span></td><td>Nói đúng sau 2 lần nghe</td></tr>
+        <tr><td>3 (hết)</td><td>40</td><td>×0.60</td><td><strong>24.0</strong></td><td><span class="badge b-red">SKIP</span></td><td>Vẫn sai sau 3 lần → skip</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════ S12 ══════════════════════════════════ -->
+<section class="section" id="s12">
+  <div class="section-label">// 12</div>
+  <h2>Score Output <span class="accent">Schema</span></h2>
+
+  <p>Output JSON chuẩn của Scoring Engine, được lưu vào bảng <code>session_items</code> trong PostgreSQL và trả về cho Frontend.</p>
+
+  <div class="code-block">
+    <div class="code-block-header"><span class="lang">json</span><span class="file">ScoreResult — full schema</span></div>
+    <pre>
+{
+  <span class="cmt">// ── Core fields ──────────────────────────────────────────────</span>
+  <span class="str">"exercise_id"</span>:          <span class="str">"SEN001"</span>,
+  <span class="str">"exercise_type"</span>:        <span class="str">"sentence_building"</span>,   <span class="cmt">// naming | command_identification | sentence_building</span>
+  <span class="str">"mode"</span>:                 <span class="kw">null</span>,                  <span class="cmt">// null | "recognition" | "repetition"</span>
+  <span class="str">"vocab_level"</span>:          <span class="num">1</span>,                     <span class="cmt">// 1-3, level trong session tại thời điểm làm bài</span>
+
+  <span class="cmt">// ── Score (CMD Mode 1: score = null, dùng is_correct) ────────</span>
+  <span class="str">"score"</span>:                <span class="num">86.0</span>,                  <span class="cmt">// adjusted score — dùng cho progression. null nếu CMD Mode 1</span>
+  <span class="str">"raw_score"</span>:            <span class="num">86.0</span>,                  <span class="cmt">// score attempt 1 (trước attempt multiplier)</span>
+  <span class="str">"weighted_score"</span>:       <span class="num">86.0</span>,                  <span class="cmt">// raw_score × difficulty_multiplier, chỉ cho SLP</span>
+  <span class="str">"is_correct"</span>:           <span class="kw">null</span>,                  <span class="cmt">// chỉ CMD Mode 1 dùng (true/false), còn lại null</span>
+
+  <span class="cmt">// ── Components (field nào không áp dụng = null) ──────────────</span>
+  <span class="str">"components"</span>: {
+    <span class="str">"keyword"</span>:            <span class="num">100</span>,   <span class="cmt">// NAM, CMD Mode 2, SEN</span>
+    <span class="str">"text_similarity"</span>:    <span class="kw">null</span>,  <span class="cmt">// NAM, CMD Mode 2</span>
+    <span class="str">"order_score"</span>:        <span class="num">75</span>,    <span class="cmt">// SEN only</span>
+    <span class="str">"classifier_present"</span>: <span class="kw">null</span>,  <span class="cmt">// NAM, CMD Mode 2</span>
+    <span class="str">"fluency"</span>:            <span class="num">85</span>
+  },
+
+  <span class="cmt">// ── Result ───────────────────────────────────────────────────</span>
+  <span class="str">"result"</span>:               <span class="str">"pass"</span>,                <span class="cmt">// "pass" | "near" | "retry" | "skip" | "correct" | "incorrect"</span>
+  <span class="str">"attempt_number"</span>:       <span class="num">1</span>,                     <span class="cmt">// 1 | 2 | 3 (SEN có fallback)</span>
+  <span class="str">"used_fallback_audio"</span>:  <span class="kw">false</span>,                 <span class="cmt">// true nếu attempt ≥ 2 (SEN only)</span>
+
+  <span class="cmt">// ── Input ────────────────────────────────────────────────────</span>
+  <span class="str">"transcript"</span>:           <span class="str">"tôi ăn cơm"</span>,          <span class="cmt">// ASR output đã normalize. null nếu CMD Mode 1</span>
+  <span class="str">"selected_vocab_id"</span>:    <span class="kw">null</span>,                  <span class="cmt">// chỉ CMD Mode 1 dùng</span>
+  <span class="str">"audio_duration_s"</span>:     <span class="num">2.4</span>,
+  <span class="str">"asr_confidence"</span>:       <span class="num">0.87</span>,
+
+  <span class="cmt">// ── Progression (level trong session) ────────────────────────</span>
+  <span class="str">"progression_action"</span>:   <span class="str">"hold"</span>,                <span class="cmt">// "hold" | "level_up"</span>
+  <span class="str">"correct_streak_after"</span>: <span class="num">1</span>,                     <span class="cmt">// số bài đúng liên tiếp cùng topic</span>
+  <span class="str">"vocab_level_after"</span>:    <span class="num">1</span>,                     <span class="cmt">// level sau bài này (reset = 1 khi sang session mới)</span>
+
+  <span class="cmt">// ── Metadata ─────────────────────────────────────────────────</span>
+  <span class="str">"topic"</span>:                <span class="str">"hoạt động thường ngày"</span>,
+  <span class="str">"timestamp"</span>:            <span class="str">"2026-06-29T10:15:30Z"</span>
+}
+</pre>
+  </div>
+
+  <h3><span class="dot dot-green"></span>Tóm tắt — Field nào dùng ở đâu</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Frontend / UX</th><th>Progression</th><th>SLP Dashboard</th><th>Database</th></tr></thead>
+      <tbody>
+        <tr><td><code>score</code></td><td>—</td><td>✅ Dùng để classify (speech)</td><td>Trend chart</td><td>✅ Lưu</td></tr>
+        <tr><td><code>is_correct</code></td><td>✅ Correct/Incorrect (CMD1)</td><td>✅ Streak (CMD1)</td><td>Pass rate</td><td>✅ Lưu</td></tr>
+        <tr><td><code>raw_score</code></td><td>—</td><td>—</td><td>✅ Xem bản gốc</td><td>✅ Lưu</td></tr>
+        <tr><td><code>weighted_score</code></td><td>—</td><td>—</td><td>✅ Chỉ tiêu này</td><td>✅ Lưu</td></tr>
+        <tr><td><code>result</code></td><td>✅ Màu / icon</td><td>✅ Đúng/sai → streak</td><td>Pass rate</td><td>✅ Lưu</td></tr>
+        <tr><td><code>components</code></td><td>—</td><td>—</td><td>✅ Phân tích lỗi</td><td>✅ JSON blob</td></tr>
+        <tr><td><code>transcript</code></td><td>—</td><td>—</td><td>✅ Review lỗi</td><td>✅ Lưu</td></tr>
+        <tr><td><code>progression_action</code></td><td>✅ Báo level up</td><td>✅ Trigger</td><td>Level chart</td><td>✅ Lưu</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <h3><span class="dot dot-yellow"></span>Tổng hợp trọng số theo exercise type</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Component</th><th>NAM</th><th>CMD Mode 1</th><th>CMD Mode 2</th><th>SEN</th></tr></thead>
+      <tbody>
+        <tr><td>keyword</td><td><strong>50%</strong></td><td>—</td><td>40%</td><td>40%</td></tr>
+        <tr><td>text_similarity</td><td>25%</td><td>—</td><td>30%</td><td>—</td></tr>
+        <tr><td>order_score</td><td>—</td><td>—</td><td>—</td><td>50%</td></tr>
+        <tr><td>classifier_present</td><td>10%</td><td>—</td><td>20%</td><td>—</td></tr>
+        <tr><td>fluency</td><td>15%</td><td>—</td><td>10%</td><td>10%</td></tr>
+        <tr><td>(không tính điểm)</td><td>—</td><td>Correct /<br>Incorrect</td><td>—</td><td>—</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>100%</strong></td><td><strong>—</strong></td><td><strong>100%</strong></td><td><strong>100%</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</section>
+
+</div><!-- /wrap -->
+
+<footer class="site-footer">
+  PhụcNgôn Scoring Engine · Technical Spec · MVP Phase 1 · Owner: Nam
+</footer>
+
+</body>
+</html>
