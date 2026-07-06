@@ -2,9 +2,10 @@
 
 import json
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -28,11 +29,17 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
 
     # CORS_ORIGINS: Danh sách origin được phép gọi API qua trình duyệt.
-    # Đọc từ env (định dạng JSON cách bằng phẩy hoặc JSON array): vd CORS_ORIGINS="https://phucngon.app,https://app.phucngon.app"
+    # Đọc từ env: vd CORS_ORIGINS="https://phucngon.app,https://app.phucngon.app"
+    # (phân tách bằng phẩy) HOẶC JSON array '["https://phucngon.app"]'.
     # Default dưới đây liệt kê các cổng Expo Web thường dùng trong môi trường DEV.
     # Khi lên PRODUCTION, PHẢI thay bằng đúng domain thật của Frontend (vd https://phucngon.app)
     # và TUYỆT ĐỐI KHÔNG để ["*"] kèm allow_credentials=True — đây là tổ hợp KHÔNG AN TOÀN.
-    CORS_ORIGINS: list[str] = [
+    #
+    # NoDecode: TẮT cơ chế tự-JSON-decode của pydantic-settings cho field kiểu list.
+    # Nếu không có NoDecode, pydantic-settings sẽ thử json.loads("https://phucngon.app")
+    # TRƯỚC KHI @field_validator chạy -> crash "error parsing value for field CORS_ORIGINS".
+    # Với NoDecode, chuỗi env thô được đưa thẳng vào parse_cors_origins() để tự tách phẩy.
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://localhost:8081",
         "http://127.0.0.1:8081",
