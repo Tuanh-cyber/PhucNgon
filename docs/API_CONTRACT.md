@@ -326,6 +326,53 @@ Sắp xếp ổn định theo topic rồi theo từ.
 
 ---
 
+## 6. Therapist — Web bác sĩ (Bước 13.1)
+
+Mô hình: bác sĩ↔bệnh nhân link qua `TherapyPlan.therapist_id` của plan ACTIVE. Có HAI loại
+bệnh nhân song song, đều hợp lệ: **có bác sĩ** (therapist_id=UUID) và **tự do**
+(therapist_id=NULL, tự đăng ký dùng một mình — không thuộc dashboard của bác sĩ nào).
+Cả 3 endpoint yêu cầu đăng nhập role=therapist (khác role → 403).
+
+### POST `/therapist/patients/claim`
+Bác sĩ NHẬN một bệnh nhân đã tự đăng ký (tra theo email) + điền hồ sơ/baseline.
+```json
+{
+  "email": "benhnhan@example.com",
+  "aphasia_type": "Broca",
+  "hospital_name": "BV Chợ Rẫy",
+  "severity_level": "Trung bình",
+  "accuracy_score": 70.0, "completion_score": 55.0, "fluency_score": 40.0
+}
+```
+- Chỉ `email` bắt buộc. `aphasia_type` ∈ `Broca|Wernicke|Anomic|Global|Conduction|Mixed|Khác`
+  (khác → 422). Có ≥1 điểm baseline → tạo Assessment + AssessmentResult (như lúc đăng ký).
+- Field không gửi thì KHÔNG đè lên hồ sơ cũ.
+
+**200:** `{ "patient_id": "uuid", "full_name": "...", "status": "claimed" | "updated" }`
+(`claimed` = vừa gán mới; `updated` = đã là bệnh nhân của tôi, idempotent cập nhật).
+**404:** email không tồn tại / không phải patient. **409:** bệnh nhân chưa có plan, HOẶC
+đã thuộc **bác sĩ khác** (không lộ tên bác sĩ kia).
+
+### GET `/therapist/me/patients`
+Danh sách bệnh nhân CỦA bác sĩ đang đăng nhập (chỉ những plan active có therapist_id = tôi).
+```json
+[
+  { "patient_id": "uuid", "full_name": "...", "email": "...",
+    "aphasia_type": "Broca", "severity_level": "Trung bình", "hospital_name": "BV Chợ Rẫy" }
+]
+```
+Bệnh nhân của bác sĩ khác và bệnh nhân tự do KHÔNG BAO GIỜ xuất hiện. (Cột chi tiết +
+filter/phân trang bổ sung ở 13.2.)
+
+### GET `/therapist/patients/{patient_id}`
+Dashboard tiến trình của 1 bệnh nhân CỦA TÔI — response y hệt
+`GET /patients/me/progress-dashboard` (daily_scores 7 + daily_scores_30 + streak +
+difficult_words), tính trên đúng bệnh nhân đó.
+**404:** bệnh nhân không tồn tại / của bác sĩ khác / tự do — trả 404 ĐỒNG NHẤT, không tiết lộ
+bệnh nhân có tồn tại hay không.
+
+---
+
 ## Quy tắc chung cho mọi API
 
 - Mọi lỗi trả về dạng: `{ "detail": "Nội dung lỗi bằng tiếng Việt" }`

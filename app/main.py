@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
-from app.routers import assessments, attempts, auth, plans, vocabulary
+from app.routers import assessments, attempts, auth, plans, therapist, vocabulary
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,7 @@ app.include_router(assessments.router)
 app.include_router(attempts.router)
 app.include_router(attempts.assignments_router)
 app.include_router(vocabulary.router)
+app.include_router(therapist.router)
 
 
 # ── Static files: ảnh từ vựng + audio câu hỏi/câu mẫu ────────────────────────

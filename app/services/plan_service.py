@@ -166,6 +166,12 @@ def create_initial_plan(db_session: Session, patient) -> TherapyPlan:
     - therapist_id = None (patient tự đăng ký, chưa có therapist nhận ca).
     - status = active, start_date = hôm nay.
     - flush() để lấy UUID; caller quyết định commit/rollback.
+
+    ⚠️ CẢNH BÁO KIẾN TRÚC (Bước 13 — web bác sĩ): link bác sĩ↔bệnh nhân đi qua
+    TherapyPlan.therapist_id của plan ACTIVE. Nếu SAU NÀY có tính năng tạo plan MỚI
+    cho bệnh nhân ĐÃ CÓ bác sĩ (đổi plan, plan giai đoạn 2...), code tạo plan PHẢI
+    copy therapist_id từ plan cũ sang plan mới — nếu không, bệnh nhân "rơi" khỏi
+    dashboard của bác sĩ (get_owned_patient / list_my_patients chỉ nhìn plan active).
     """
     vocab_level = _severity_to_level(patient.severity_level)
 
