@@ -13,6 +13,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr
 
+from app.schemas.assessment import ProgressDashboardResponse
+
 # Danh sách loại aphasia hợp lệ khi bác sĩ nhập (validate tầng API, cột DB vẫn là
 # String để không vỡ dữ liệu tự đăng ký cũ dạng text tự do).
 AphasiaType = Literal[
@@ -42,7 +44,7 @@ class ClaimPatientResponse(BaseModel):
 
 
 class TherapistPatientItem(BaseModel):
-    """1 bệnh nhân trong danh sách của bác sĩ (GET /therapist/me/patients) — tối thiểu cho 13.1."""
+    """1 dòng bảng bệnh nhân của bác sĩ (GET /therapist/me/patients — 13.2, khớp mockup Ảnh 1)."""
 
     patient_id: str
     full_name: str
@@ -50,3 +52,63 @@ class TherapistPatientItem(BaseModel):
     aphasia_type: Optional[str]
     severity_level: Optional[str]
     hospital_name: Optional[str]
+    # ── Cột số liệu (13.2) ──
+    progress_week: Optional[float]      # % hoàn thành CẤP PLAN (completion có sẵn); None = chưa có dữ liệu
+    avg_score_2days: Optional[float]    # TB điểm 2 ngày qua; None = không có buổi có điểm
+    streak_days: int                    # chuỗi ngày luyện liên tiếp (tái dùng streak dashboard)
+    sessions_per_week: int              # số NGÀY có luyện trong 7 ngày gần nhất (0..7, hiển thị x/7)
+    status: Literal["good", "attention"]  # attention = 0 buổi graded trong 3 ngày qua
+
+
+class TherapistPatientListResponse(BaseModel):
+    """Bảng bệnh nhân có phân trang: total = tổng SAU filter, items = trang hiện tại."""
+
+    total: int
+    items: list[TherapistPatientItem]
+
+
+class AttentionPatient(BaseModel):
+    """1 bệnh nhân trong banner 'N bệnh nhân chưa luyện tập 3 ngày'."""
+
+    patient_id: str
+    full_name: str
+
+
+class DashboardSummaryResponse(BaseModel):
+    """4 thẻ + banner đầu dashboard bác sĩ (GET /therapist/dashboard-summary — 13.3).
+    MỌI con số tính trên TẬP bệnh nhân của bác sĩ đăng nhập."""
+
+    total_patients: int
+    practicing: int                       # ≥1 buổi graded trong 7 ngày qua
+    need_attention: int                   # 0 buổi graded trong 3 ngày qua
+    weekly_completion: Optional[float]    # TB progress_week across bệnh nhân (bỏ None); None = chưa ai có dữ liệu
+    attention_list: list[AttentionPatient]
+
+
+class PatientHeader(BaseModel):
+    """Khối hồ sơ đầu màn chi tiết (13.4, Ảnh 2)."""
+
+    full_name: str
+    age: int                              # tính từ date_of_birth
+    aphasia_type: Optional[str]
+    severity_level: Optional[str]
+    hospital_name: Optional[str]
+    doctor_name: str                      # = full_name bác sĩ đang đăng nhập
+
+
+class InsightItem(BaseModel):
+    """1 câu nhận xét rule-based từ 3 metrics — type để frontend tô màu."""
+
+    type: Literal["ok", "warn"]
+    text: str
+
+
+class TherapistPatientDetailResponse(BaseModel):
+    """Chi tiết 1 bệnh nhân của tôi (GET /therapist/patients/{id} — 13.4, Ảnh 2)."""
+
+    patient: PatientHeader
+    dashboard: ProgressDashboardResponse    # tái dùng nguyên dashboard app bệnh nhân
+    avg_score_day: Optional[float]          # TB điểm/ngày trên 7 ngày (bỏ ngày trống)
+    sessions_per_week: int                  # số ngày có luyện trong 7 ngày gần nhất (x/7)
+    score_delta_vs_last_week: Optional[float]  # TB 7 ngày này - TB 7 ngày trước; None nếu thiếu 1 cửa sổ
+    insight: InsightItem

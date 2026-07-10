@@ -165,14 +165,22 @@ def _add_graded_session(patient_id: str, score: float = 88.0) -> None:
 # ── 9 kịch bản cô lập ─────────────────────────────────────────────────────────
 
 def test_1_a_views_own_patient_200(cleanup_test_data):
-    """1. A xem chi tiết bệnh nhân của A -> 200, đúng shape dashboard."""
+    """1. A xem chi tiết bệnh nhân của A -> 200, đúng shape 13.4 (header + dashboard + insight)."""
     w = _setup_world()
     resp = client.get(f"/therapist/patients/{w['pat_a_id']}", headers=_auth(w["ther_a"]["token"]))
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert len(data["daily_scores"]) == 7
-    assert len(data["daily_scores_30"]) == 30
-    assert "streak" in data and "difficult_words" in data
+    # Khối hồ sơ
+    assert data["patient"]["full_name"] == "TEST_PATIENT_DO_NOT_USE"
+    assert data["patient"]["age"] >= 40  # sinh 1980
+    assert data["patient"]["doctor_name"] == "TEST_THERAPIST_DO_NOT_USE"
+    # Dashboard tái dùng nguyên shape app bệnh nhân
+    assert len(data["dashboard"]["daily_scores"]) == 7
+    assert len(data["dashboard"]["daily_scores_30"]) == 30
+    assert "streak" in data["dashboard"] and "difficult_words" in data["dashboard"]
+    # Metric bổ sung 13.4
+    assert data["sessions_per_week"] == 0  # chưa luyện buổi nào
+    assert data["insight"]["type"] in ("ok", "warn")
 
 
 def test_2_a_views_b_patient_404(cleanup_test_data):
@@ -220,10 +228,12 @@ def test_6_list_only_own_patients(cleanup_test_data):
     w = _setup_world()
     resp = client.get("/therapist/me/patients", headers=_auth(w["ther_a"]["token"]))
     assert resp.status_code == 200
-    ids = {p["patient_id"] for p in resp.json()}
+    data = resp.json()
+    ids = {p["patient_id"] for p in data["items"]}
     assert w["pat_a_id"] in ids
     assert w["pat_b_id"] not in ids
     assert w["pat_free_id"] not in ids
+    assert data["total"] == len(data["items"])
 
 
 def test_7_invariant_b_activity_does_not_change_a(cleanup_test_data):
@@ -262,7 +272,7 @@ def test_8_claim_three_branches(cleanup_test_data):
 
     # Hồ sơ đã được ghi (aphasia_type từ r1, severity từ r2 — không đè None)
     listed = client.get("/therapist/me/patients", headers=_auth(ther_a["token"])).json()
-    me = next(p for p in listed if p["email"] == pat["email"])
+    me = next(p for p in listed["items"] if p["email"] == pat["email"])
     assert me["aphasia_type"] == "Broca"
     assert me["hospital_name"] == "BV Chợ Rẫy"
     assert me["severity_level"] == "Trung bình"
@@ -277,3 +287,76 @@ def test_9_claim_unknown_email_404(cleanup_test_data):
     other = _register_therapist()
     r2 = _claim(ther["token"], other["email"])
     assert r2.status_code == 404
+
+
+# ── 13.2/13.3/13.4: số liệu + ngưỡng ─────────────────────────────────────────
+
+def test_10_attention_threshold_and_summary(cleanup_test_data):
+    """Ngưỡng 3 ngày: bệnh nhân KHÔNG luyện -> status 'attention' + vào need_attention/banner.
+    Bệnh nhân CÓ buổi graded hôm nay -> 'good' + đếm vào practicing."""
+    ther = _register_therapist()
+    pat_idle, pat_active = _register_patient(), _register_patient()
+    assert _claim(ther["token"], pat_idle["email"]).status_code == 200
+    assert _claim(ther["token"], pat_active["email"]).status_code == 200
+
+    active_id = _patient_id_of(pat_active["email"])
+    idle_id = _patient_id_of(pat_idle["email"])
+    _add_graded_session(active_id, score=75.0)  # hôm nay -> trong cửa sổ 3 và 7 ngày
+
+    h = _auth(ther["token"])
+
+    # 13.2: status từng dòng
+    items = client.get("/therapist/me/patients", headers=h).json()["items"]
+    by_id = {p["patient_id"]: p for p in items}
+    assert by_id[idle_id]["status"] == "attention"
+    assert by_id[active_id]["status"] == "good"
+    assert by_id[active_id]["sessions_per_week"] == 1
+    assert by_id[active_id]["avg_score_2days"] == 75.0
+    assert by_id[idle_id]["avg_score_2days"] is None
+
+    # 13.2: filter status hoạt động + total sau filter
+    only_attention = client.get(
+        "/therapist/me/patients?status=attention", headers=h
+    ).json()
+    assert {p["patient_id"] for p in only_attention["items"]} == {idle_id}
+    assert only_attention["total"] == 1
+
+    # 13.3: summary đếm đúng trên tập của tôi
+    s = client.get("/therapist/dashboard-summary", headers=h).json()
+    assert s["total_patients"] == 2
+    assert s["practicing"] == 1
+    assert s["need_attention"] == 1
+    assert [a["patient_id"] for a in s["attention_list"]] == [idle_id]
+
+
+def test_11_summary_isolated_from_other_therapist(cleanup_test_data):
+    """13.3 vẫn sau mask: bệnh nhân của B và bệnh nhân tự do KHÔNG lọt vào summary của A."""
+    w = _setup_world()  # A có 1 bệnh nhân; B có 1; 1 tự do
+    s = client.get("/therapist/dashboard-summary", headers=_auth(w["ther_a"]["token"])).json()
+    assert s["total_patients"] == 1  # chỉ bệnh nhân của A
+    ids_in_banner = {a["patient_id"] for a in s["attention_list"]}
+    assert w["pat_b_id"] not in ids_in_banner
+    assert w["pat_free_id"] not in ids_in_banner
+    # patient token -> 403
+    assert (
+        client.get("/therapist/dashboard-summary", headers=_auth(w["pat_a_token"])).status_code
+        == 403
+    )
+
+
+def test_12_detail_insight_and_delta(cleanup_test_data):
+    """13.4: bệnh nhân có buổi graded điểm cao hôm nay -> sessions_per_week=1, avg_score_day
+    có giá trị; insight trả type/text hợp lệ; delta None khi tuần trước trống."""
+    ther = _register_therapist()
+    pat = _register_patient()
+    assert _claim(ther["token"], pat["email"]).status_code == 200
+    pid = _patient_id_of(pat["email"])
+    _add_graded_session(pid, score=90.0)
+
+    data = client.get(f"/therapist/patients/{pid}", headers=_auth(ther["token"])).json()
+    assert data["sessions_per_week"] == 1
+    assert data["avg_score_day"] == 90.0
+    # Tuần trước không có dữ liệu -> delta None
+    assert data["score_delta_vs_last_week"] is None
+    assert data["insight"]["type"] in ("ok", "warn")
+    assert len(data["insight"]["text"]) > 10
