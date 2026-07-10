@@ -301,6 +301,31 @@ Giống hệt response trên nhưng không yêu cầu đăng nhập, không lưu
 
 ---
 
+## 5. Vocabulary — Từ vựng cho flashcard
+
+### GET `/vocabulary?topic={topic}`
+Toàn bộ từ vựng trong ngân hàng (90 từ) kèm URL ảnh + audio phát âm — dùng cho màn flashcard.
+Yêu cầu đăng nhập. `topic` optional ∈ `daily_activity` | `food_drink` | `household_item` |
+`family` | `body_part` | `number` (lọc theo chủ đề); bỏ trống = trả hết; giá trị khác → 422.
+Sắp xếp ổn định theo topic rồi theo từ.
+```json
+[
+  {
+    "vocab_id": "uuid",
+    "word": "ăn cơm",
+    "topic": "daily_activity",
+    "word_type": "verb",
+    "image_url": "/static/pictures/Activity/VAC1001.jpg",
+    "audio_url": "/static/vocab-audio/VAC1001.wav"
+  }
+]
+```
+- `word` = canonical_word. KHÔNG trả `accepted_answers` (đáp án chấm điểm chỉ ở phía scoring).
+- `image_url` / `audio_url`: đường dẫn tương đối `/static/...` (frontend ghép qua `buildAssetUrl`);
+  `null` nếu file thiếu trên server — frontend hiện placeholder/ẩn nút, KHÔNG gọi URL 404.
+
+---
+
 ## Quy tắc chung cho mọi API
 
 - Mọi lỗi trả về dạng: `{ "detail": "Nội dung lỗi bằng tiếng Việt" }`

@@ -25,6 +25,18 @@ class AssignmentListItem(BaseModel):
     status: Literal["pending", "completed"]
 
 
+# ── Từ vựng cho flashcard (GET /vocabulary) ──────────────────────────────────
+class VocabularyItem(BaseModel):
+    """1 từ vựng kèm URL ảnh + audio để làm flashcard. KHÔNG chứa accepted_answers."""
+
+    vocab_id: str
+    word: str                       # canonical_word
+    topic: str                      # enum value, vd "food_drink"
+    word_type: str                  # enum value: noun | verb | adjective
+    image_url: Optional[str]        # /static/pictures/...; None nếu thiếu file
+    audio_url: Optional[str]        # /static/vocab-audio/...; None nếu thiếu file
+
+
 # ── Bài tập đề xuất theo profile bệnh (GET /patients/me/recommended-exercises) ─
 class RecommendedExercise(BaseModel):
     """1 loại bài kèm trọng số gợi ý theo profile bệnh (rule.md Profile => Exercise Weight)."""
