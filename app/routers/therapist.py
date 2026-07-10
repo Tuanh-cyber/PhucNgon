@@ -35,6 +35,7 @@ from app.models.user import Patient, User
 from app.routers.auth import get_current_user
 from app.schemas.assessment import ProgressDashboardResponse
 from app.schemas.therapist import (
+    PatientStats3,
     AttentionPatient,
     ClaimPatientRequest,
     ClaimPatientResponse,
@@ -393,6 +394,7 @@ def get_patient_detail(
             doctor_name=current_user.full_name,
         ),
         dashboard=ProgressDashboardResponse(**dash),
+        stats=PatientStats3(**stats),  # 3 chỉ số thành phần — cùng nguồn với insight
         avg_score_day=_avg_of_daily(dash["daily_scores"]),
         sessions_per_week=sum(1 for d in dash["daily_scores"] if d["session_count"] > 0),
         score_delta_vs_last_week=delta,

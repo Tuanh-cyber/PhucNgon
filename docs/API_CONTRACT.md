@@ -400,6 +400,7 @@ Chi tiết 1 bệnh nhân CỦA TÔI.
                "severity_level": "Trung bình", "hospital_name": "BV Chợ Rẫy",
                "doctor_name": "BS. Trần Thanh Phúc" },
   "dashboard": { "...": "y hệt GET /patients/me/progress-dashboard (daily_scores 7 + 30 + streak + difficult_words)" },
+  "stats": { "accuracy_score": 85.0, "completion_score": 3.3, "fluency_score": 45.0 },
   "avg_score_day": 85.0,
   "sessions_per_week": 1,
   "score_delta_vs_last_week": null,
@@ -407,6 +408,8 @@ Chi tiết 1 bệnh nhân CỦA TÔI.
 }
 ```
 - `age` tính từ date_of_birth; `doctor_name` = tên bác sĩ đang đăng nhập.
+- `stats`: 3 chỉ số thành phần (mục "Phân tích thành phần") — CÙNG nguồn compute_patient_stats
+  với insight; từng field `null` = chưa có dữ liệu.
 - `score_delta_vs_last_week`: TB 7 ngày gần nhất − TB 7 ngày trước đó; `null` nếu 1 trong 2 cửa
   sổ không có dữ liệu.
 - `insight`: rule-based, chọn tiêu chí YẾU NHẤT dưới ngưỡng 60 trong 3 metric

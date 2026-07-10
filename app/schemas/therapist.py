@@ -103,11 +103,20 @@ class InsightItem(BaseModel):
     text: str
 
 
+class PatientStats3(BaseModel):
+    """3 chỉ số thành phần (mục 'Phân tích thành phần' Ảnh 2) — None = chưa có dữ liệu."""
+
+    accuracy_score: Optional[float]
+    completion_score: Optional[float]
+    fluency_score: Optional[float]
+
+
 class TherapistPatientDetailResponse(BaseModel):
     """Chi tiết 1 bệnh nhân của tôi (GET /therapist/patients/{id} — 13.4, Ảnh 2)."""
 
     patient: PatientHeader
     dashboard: ProgressDashboardResponse    # tái dùng nguyên dashboard app bệnh nhân
+    stats: PatientStats3                    # 3 chỉ số thành phần (nguồn của insight)
     avg_score_day: Optional[float]          # TB điểm/ngày trên 7 ngày (bỏ ngày trống)
     sessions_per_week: int                  # số ngày có luyện trong 7 ngày gần nhất (x/7)
     score_delta_vs_last_week: Optional[float]  # TB 7 ngày này - TB 7 ngày trước; None nếu thiếu 1 cửa sổ
