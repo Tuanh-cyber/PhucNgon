@@ -31,7 +31,10 @@
   "fluency_score": 45.0
 }
 ```
-Các field `phone_number` (SĐT bệnh nhân), `address`, `caregiver_phone` (SĐT người chăm sóc),
+**`phone_number` (SĐT bệnh nhân) BẮT BUỘC** — Mô hình A: bác sĩ nhận bệnh nhân bằng sđt.
+Backend CHUẨN HÓA trước khi lưu (bỏ khoảng trắng/chấm/gạch, `+84`/`84` đầu → `0`; DB lưu dạng
+`0xxxxxxxxx`). Số không hợp lệ (không ra 10-11 chữ số bắt đầu 0) → **422**.
+Các field `address`, `caregiver_phone` (SĐT người chăm sóc — KHÔNG ép định dạng),
 `aphasia_type`, `severity_level`, `hospital_name`, `referring_doctor_name`,
 `accuracy_score`, `completion_score`, `fluency_score` đều **optional**.
 `address` → lưu `Profile.address`; `caregiver_phone` → lưu `Profile.emergency_contact`
@@ -41,7 +44,8 @@ Các field `phone_number` (SĐT bệnh nhân), `address`, `caregiver_phone` (SĐ
 ```json
 { "access_token": "eyJ...", "token_type": "bearer", "role": "patient" }
 ```
-**Response 409:** email đã tồn tại.
+**Response 409:** email đã tồn tại, HOẶC **số điện thoại đã được bệnh nhân khác đăng ký**
+(so trên dạng chuẩn hóa — `0912...` và `+8491 2...` tính là cùng số).
 
 ### POST `/auth/register/therapist`
 Tương tự, cho bác sĩ. Field riêng: `license_no` (bắt buộc), `specialization` (optional).
@@ -334,24 +338,30 @@ bệnh nhân song song, đều hợp lệ: **có bác sĩ** (therapist_id=UUID) 
 Cả 3 endpoint yêu cầu đăng nhập role=therapist (khác role → 403).
 
 ### POST `/therapist/patients/claim`
-Bác sĩ NHẬN một bệnh nhân đã tự đăng ký (tra theo email) + điền hồ sơ/baseline.
+Bác sĩ NHẬN một bệnh nhân đã đăng ký — khớp theo **SỐ ĐIỆN THOẠI** (Mô hình A: bệnh nhân
+đăng ký kèm sđt; bác sĩ nhập số để nhận). Số được CHUẨN HÓA trước khi so khớp: bỏ khoảng
+trắng/chấm/gạch/ngoặc, `+84`/`84` đầu → `0` — nên nhập `0912345678`, `+84 91 234 5678`,
+`0912.345.678`... đều khớp cùng một bệnh nhân.
 ```json
 {
-  "email": "benhnhan@example.com",
+  "phone": "0912345678",
   "aphasia_type": "Broca",
   "hospital_name": "BV Chợ Rẫy",
   "severity_level": "Trung bình",
   "accuracy_score": 70.0, "completion_score": 55.0, "fluency_score": 40.0
 }
 ```
-- Chỉ `email` bắt buộc. `aphasia_type` ∈ `Broca|Wernicke|Anomic|Global|Conduction|Mixed|Khác`
+- Chỉ `phone` bắt buộc. `aphasia_type` ∈ `Broca|Wernicke|Anomic|Global|Conduction|Mixed|Khác`
   (khác → 422). Có ≥1 điểm baseline → tạo Assessment + AssessmentResult (như lúc đăng ký).
 - Field không gửi thì KHÔNG đè lên hồ sơ cũ.
 
 **200:** `{ "patient_id": "uuid", "full_name": "...", "status": "claimed" | "updated" }`
 (`claimed` = vừa gán mới; `updated` = đã là bệnh nhân của tôi, idempotent cập nhật).
-**404:** email không tồn tại / không phải patient. **409:** bệnh nhân chưa có plan, HOẶC
+**422:** số không hợp lệ (cần số VN 10-11 chữ số).
+**404:** không bệnh nhân nào dùng số này — "bệnh nhân cần đăng ký kèm SĐT trước".
+**409:** nhiều bệnh nhân trùng số (cần xác định thêm), HOẶC bệnh nhân chưa có plan, HOẶC
 đã thuộc **bác sĩ khác** (không lộ tên bác sĩ kia).
+⚠️ Bệnh nhân cũ đăng ký KHÔNG kèm sđt sẽ không claim được bằng cách này (đăng ký mới đã BẮT BUỘC sđt nên chỉ ảnh hưởng tài khoản cũ).
 
 ### GET `/therapist/me/patients` *(13.2 — bảng bệnh nhân, mockup Ảnh 1)*
 Bảng bệnh nhân CỦA bác sĩ đang đăng nhập, kèm số liệu. Query optional: `severity`,

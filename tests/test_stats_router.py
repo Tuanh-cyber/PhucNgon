@@ -48,6 +48,7 @@ def _register_patient() -> dict:
         "full_name": "TEST_PATIENT_DO_NOT_USE",
         "email": email,
         "password": "secret123",
+        "phone_number": f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}",  # phone BẮT BUỘC (Mô hình A)
         "date_of_birth": "1980-01-01",
         "gender": "male",
         "severity_level": "Nặng",
@@ -82,6 +83,7 @@ def test_get_my_stats_requires_patient_role(cleanup_test_users):
             "full_name": "TEST_THERAPIST_DO_NOT_USE",
             "email": email,
             "password": "secret123",
+            "phone_number": f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}",  # phone BẮT BUỘC (Mô hình A)
             "license_no": "LIC-TEST-001",
         },
     )

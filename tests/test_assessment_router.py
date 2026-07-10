@@ -55,7 +55,7 @@ def _patient_payload(email: str, **extra) -> dict:
         "full_name": "TEST_PATIENT_DO_NOT_USE",
         "email": email,
         "password": "secret123",
-        "phone_number": "0900000000",
+        "phone_number": f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}",  # unique (chống trùng số)
         "date_of_birth": "1980-01-01",
         "gender": "male",
         "aphasia_type": "broca",

@@ -60,7 +60,7 @@ def _patient_payload(email: str) -> dict:
         "full_name": "TEST_PATIENT_DO_NOT_USE",
         "email": email,
         "password": "secret123",
-        "phone_number": "0900000000",
+        "phone_number": f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}",  # unique (chống trùng số)
         "date_of_birth": "1980-01-01",
         "gender": "male",
         "aphasia_type": "broca",
@@ -181,3 +181,66 @@ def test_register_with_caregiver_phone_sets_emergency_contact(cleanup_test_users
         assert profile.address is None
     finally:
         db.close()
+
+
+# ── Phone bệnh nhân BẮT BUỘC (Mô hình A) ─────────────────────────────────────
+
+def test_register_patient_missing_phone_422(cleanup_test_users):
+    """Đăng ký bệnh nhân THIẾU phone_number -> 422 (field bắt buộc)."""
+    payload = _patient_payload(_unique_email())
+    del payload["phone_number"]
+    resp = client.post("/auth/register/patient", json=payload)
+    assert resp.status_code == 422
+
+
+def test_register_patient_garbage_phone_422(cleanup_test_users):
+    """Phone rác (chữ / quá ngắn) -> 422 với message tiếng Việt."""
+    for bad in ("abc", "123", "09x9y8z7"):
+        payload = _patient_payload(_unique_email())
+        payload["phone_number"] = bad
+        resp = client.post("/auth/register/patient", json=payload)
+        assert resp.status_code == 422, f"phone {bad!r} phải bị 422"
+
+
+def test_register_patient_phone_normalized_stored(cleanup_test_users):
+    """Nhập '+84 91 234 5678' -> DB lưu DẠNG CHUẨN '0912345678'."""
+    email = _unique_email()
+    suffix = f"{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}"
+    payload = _patient_payload(email)
+    payload["phone_number"] = f"+84 9{suffix[0]} {suffix[1:4]} {suffix[4:]}"
+    resp = client.post("/auth/register/patient", json=payload)
+    assert resp.status_code == 201, resp.text
+
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.email == email).one()
+        assert u.phone_number == f"09{suffix}"  # đã chuẩn hóa, không còn +84/khoảng trắng
+    finally:
+        db.close()
+
+
+def test_register_patient_duplicate_phone_409(cleanup_test_users):
+    """Số đã có bệnh nhân khác dùng (kể cả khác định dạng thô) -> 409."""
+    phone = f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}"
+    p1 = _patient_payload(_unique_email())
+    p1["phone_number"] = phone
+    assert client.post("/auth/register/patient", json=p1).status_code == 201
+
+    p2 = _patient_payload(_unique_email())
+    p2["phone_number"] = "+84" + phone[1:]  # khác chuỗi thô, TRÙNG sau chuẩn hóa
+    r2 = client.post("/auth/register/patient", json=p2)
+    assert r2.status_code == 409
+    assert "Số điện thoại đã được đăng ký" in r2.json()["detail"]
+
+
+def test_register_patient_caregiver_phone_still_optional(cleanup_test_users):
+    """caregiver_phone (người thân) vẫn OPTIONAL và không bị ép định dạng."""
+    # Không gửi caregiver_phone -> vẫn 201
+    assert (
+        client.post("/auth/register/patient", json=_patient_payload(_unique_email())).status_code
+        == 201
+    )
+    # Gửi caregiver_phone dạng tự do -> vẫn 201 (không validate như phone bệnh nhân)
+    payload = _patient_payload(_unique_email())
+    payload["caregiver_phone"] = "0987 654 321 (con trai)"
+    assert client.post("/auth/register/patient", json=payload).status_code == 201

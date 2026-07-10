@@ -183,6 +183,7 @@ def _register_patient() -> dict:
     email = f"test_{uuid.uuid4().hex[:10]}@example.com"
     resp = client.post("/auth/register/patient", json={
         "full_name": "TEST_PATIENT_DO_NOT_USE", "email": email, "password": "secret123",
+        "phone_number": f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}",  # phone BẮT BUỘC (Mô hình A)
         "date_of_birth": "1980-01-01", "gender": "male", "severity_level": "Nặng"})
     assert resp.status_code == 201, resp.text
     data = resp.json()

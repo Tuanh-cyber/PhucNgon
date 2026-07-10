@@ -53,21 +53,28 @@ def cleanup_test_data():
             db.close()
 
 
-def _register_patient() -> dict:
+def _unique_phone() -> str:
+    """Sđt VN 10 số duy nhất cho mỗi lần gọi (09 + 8 chữ số từ uuid)."""
+    return f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}"
+
+
+def _register_patient(phone: str | None = None) -> dict:
     email = f"test_{uuid.uuid4().hex[:10]}@example.com"
+    phone = phone or _unique_phone()
     resp = client.post(
         "/auth/register/patient",
         json={
             "full_name": "TEST_PATIENT_DO_NOT_USE",
             "email": email,
             "password": "secret123",
+            "phone_number": phone,  # claim khớp theo SĐT (Mô hình A)
             "date_of_birth": "1980-01-01",
             "gender": "male",
             "severity_level": "Nặng",
         },
     )
     assert resp.status_code == 201, resp.text
-    return {"email": email, "token": resp.json()["access_token"]}
+    return {"email": email, "phone": phone, "token": resp.json()["access_token"]}
 
 
 def _register_therapist() -> dict:
@@ -91,10 +98,10 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _claim(therapist_token: str, patient_email: str, **extra) -> object:
+def _claim(therapist_token: str, patient_phone: str, **extra) -> object:
     return client.post(
         "/therapist/patients/claim",
-        json={"email": patient_email, **extra},
+        json={"phone": patient_phone, **extra},
         headers=_auth(therapist_token),
     )
 
@@ -112,8 +119,8 @@ def _setup_world():
     ther_a, ther_b = _register_therapist(), _register_therapist()
     pat_a, pat_b, pat_free = _register_patient(), _register_patient(), _register_patient()
 
-    assert _claim(ther_a["token"], pat_a["email"]).status_code == 200
-    assert _claim(ther_b["token"], pat_b["email"]).status_code == 200
+    assert _claim(ther_a["token"], pat_a["phone"]).status_code == 200
+    assert _claim(ther_b["token"], pat_b["phone"]).status_code == 200
     # pat_free: KHÔNG claim — therapist_id giữ NULL (hợp lệ)
 
     return {
@@ -123,6 +130,7 @@ def _setup_world():
         "pat_b_id": _patient_id_of(pat_b["email"]),
         "pat_free_id": _patient_id_of(pat_free["email"]),
         "pat_a_email": pat_a["email"],
+        "pat_a_phone": pat_a["phone"],
         "pat_a_token": pat_a["token"],
     }
 
@@ -207,7 +215,7 @@ def test_4_patient_token_forbidden_403(cleanup_test_data):
     assert client.get(f"/therapist/patients/{w['pat_a_id']}", headers=h).status_code == 403
     assert (
         client.post(
-            "/therapist/patients/claim", json={"email": w["pat_a_email"]}, headers=h
+            "/therapist/patients/claim", json={"phone": w["pat_a_phone"]}, headers=h
         ).status_code
         == 403
     )
@@ -218,7 +226,7 @@ def test_5_unauthenticated_401():
     assert client.get("/therapist/me/patients").status_code == 401
     assert client.get(f"/therapist/patients/{uuid.uuid4()}").status_code == 401
     assert (
-        client.post("/therapist/patients/claim", json={"email": "x@example.com"}).status_code
+        client.post("/therapist/patients/claim", json={"phone": "0912345678"}).status_code
         == 401
     )
 
@@ -258,15 +266,15 @@ def test_8_claim_three_branches(cleanup_test_data):
     ther_a, ther_b = _register_therapist(), _register_therapist()
     pat = _register_patient()
 
-    r1 = _claim(ther_a["token"], pat["email"], aphasia_type="Broca", hospital_name="BV Chợ Rẫy")
+    r1 = _claim(ther_a["token"], pat["phone"], aphasia_type="Broca", hospital_name="BV Chợ Rẫy")
     assert r1.status_code == 200, r1.text
     assert r1.json()["status"] == "claimed"
 
-    r2 = _claim(ther_a["token"], pat["email"], severity_level="Trung bình")
+    r2 = _claim(ther_a["token"], pat["phone"], severity_level="Trung bình")
     assert r2.status_code == 200
     assert r2.json()["status"] == "updated"
 
-    r3 = _claim(ther_b["token"], pat["email"])
+    r3 = _claim(ther_b["token"], pat["phone"])
     assert r3.status_code == 409
     assert "bác sĩ khác" in r3.json()["detail"]
 
@@ -278,14 +286,26 @@ def test_8_claim_three_branches(cleanup_test_data):
     assert me["severity_level"] == "Trung bình"
 
 
-def test_9_claim_unknown_email_404(cleanup_test_data):
-    """9. Claim email không tồn tại (hoặc không phải patient) -> 404."""
+def test_9_claim_unknown_phone_404(cleanup_test_data):
+    """9. Claim số hợp lệ nhưng KHÔNG có bệnh nhân nào dùng -> 404 (kèm hướng dẫn đăng ký)."""
     ther = _register_therapist()
-    r = _claim(ther["token"], f"khongton_{uuid.uuid4().hex[:8]}@example.com")
+    r = _claim(ther["token"], _unique_phone())  # số hợp lệ, chưa ai đăng ký
     assert r.status_code == 404
-    # Email của một THERAPIST (tồn tại nhưng không phải patient) -> cũng 404
-    other = _register_therapist()
-    r2 = _claim(ther["token"], other["email"])
+    assert "đăng ký kèm SĐT" in r.json()["detail"]
+    # Số của một THERAPIST (tồn tại trong users nhưng không phải patient) -> cũng 404
+    ther_phone = _unique_phone()
+    email = f"test_{uuid.uuid4().hex[:10]}@example.com"
+    client.post(
+        "/auth/register/therapist",
+        json={
+            "full_name": "TEST_THERAPIST_DO_NOT_USE",
+            "email": email,
+            "password": "secret123",
+            "phone_number": ther_phone,
+            "license_no": f"LIC-{uuid.uuid4().hex[:6]}",
+        },
+    )
+    r2 = _claim(ther["token"], ther_phone)
     assert r2.status_code == 404
 
 
@@ -296,8 +316,8 @@ def test_10_attention_threshold_and_summary(cleanup_test_data):
     Bệnh nhân CÓ buổi graded hôm nay -> 'good' + đếm vào practicing."""
     ther = _register_therapist()
     pat_idle, pat_active = _register_patient(), _register_patient()
-    assert _claim(ther["token"], pat_idle["email"]).status_code == 200
-    assert _claim(ther["token"], pat_active["email"]).status_code == 200
+    assert _claim(ther["token"], pat_idle["phone"]).status_code == 200
+    assert _claim(ther["token"], pat_active["phone"]).status_code == 200
 
     active_id = _patient_id_of(pat_active["email"])
     idle_id = _patient_id_of(pat_idle["email"])
@@ -349,7 +369,7 @@ def test_12_detail_insight_and_delta(cleanup_test_data):
     có giá trị; insight trả type/text hợp lệ; delta None khi tuần trước trống."""
     ther = _register_therapist()
     pat = _register_patient()
-    assert _claim(ther["token"], pat["email"]).status_code == 200
+    assert _claim(ther["token"], pat["phone"]).status_code == 200
     pid = _patient_id_of(pat["email"])
     _add_graded_session(pid, score=90.0)
 
@@ -360,3 +380,60 @@ def test_12_detail_insight_and_delta(cleanup_test_data):
     assert data["score_delta_vs_last_week"] is None
     assert data["insight"]["type"] in ("ok", "warn")
     assert len(data["insight"]["text"]) > 10
+
+
+# ── Claim theo SĐT: chuẩn hóa định dạng + trùng số ───────────────────────────
+
+def test_13_claim_phone_formats(cleanup_test_data):
+    """Cùng 1 số nhập ở nhiều định dạng (+84 / có chấm / có khoảng trắng) đều khớp đúng
+    1 bệnh nhân (lần đầu claimed, các lần sau updated — idempotent)."""
+    ther = _register_therapist()
+    base = _unique_phone()                      # vd "0912345678"
+    _register_patient(phone=base)
+
+    intl = "+84 " + base[1:3] + " " + base[3:6] + " " + base[6:]   # "+84 91 234 5678"
+    dotted = base[:4] + "." + base[4:7] + "." + base[7:]            # "0912.345.678"
+
+    r1 = _claim(ther["token"], intl)
+    assert r1.status_code == 200, r1.text
+    assert r1.json()["status"] == "claimed"
+
+    r2 = _claim(ther["token"], dotted)
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "updated"
+
+    r3 = _claim(ther["token"], base)
+    assert r3.status_code == 200
+    assert r3.json()["status"] == "updated"
+
+
+def test_14_claim_duplicate_phone_409(cleanup_test_data):
+    """Hai bệnh nhân trùng số (sau chuẩn hóa) -> claim 409 'Nhiều bệnh nhân trùng số'.
+
+    Đăng ký giờ đã CHẶN trùng số (409) nên không tạo được trùng qua API — sửa thẳng DB
+    (mô phỏng dữ liệu cũ trước khi có guard) để test lớp phòng thủ thứ 2 ở claim.
+    """
+    ther = _register_therapist()
+    dup = _unique_phone()
+    _register_patient(phone=dup)
+    pat2 = _register_patient()  # số khác -> đăng ký OK
+
+    # Sửa DB: patient 2 mang biến thể "+84..." của cùng số (khác chuỗi thô, TRÙNG chuẩn hóa)
+    db = SessionLocal()
+    try:
+        u2 = db.query(User).filter(User.email == pat2["email"]).one()
+        u2.phone_number = "+84" + dup[1:]
+        db.commit()
+    finally:
+        db.close()
+
+    r = _claim(ther["token"], dup)
+    assert r.status_code == 409
+    assert "trùng số" in r.json()["detail"]
+
+
+def test_15_claim_invalid_phone_422(cleanup_test_data):
+    """Số không hợp lệ (chữ, quá ngắn) -> 422."""
+    ther = _register_therapist()
+    assert _claim(ther["token"], "abc").status_code == 422
+    assert _claim(ther["token"], "123").status_code == 422

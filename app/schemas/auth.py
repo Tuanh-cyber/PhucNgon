@@ -7,9 +7,10 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 from app.models.enums import Gender
+from app.services.phone_service import normalize_phone
 
 
 class PatientRegisterRequest(BaseModel):
@@ -18,7 +19,10 @@ class PatientRegisterRequest(BaseModel):
     full_name: str
     email: EmailStr
     password: str
-    phone_number: Optional[str] = None  # SĐT của BỆNH NHÂN
+    # SĐT của BỆNH NHÂN — BẮT BUỘC (Mô hình A: bác sĩ claim theo sđt). Validator dưới
+    # chuẩn hóa và LƯU DẠNG CHUẨN "0xxxxxxxxx"; số rác -> 422. Cột users.phone_number
+    # vẫn nullable (dùng chung mọi role — bác sĩ không bắt buộc), chỉ ÉP ở tầng API này.
+    phone_number: str
     date_of_birth: date
     gender: Gender
     # "Địa chỉ" + "SĐT người chăm sóc" trong UI đăng ký. Lưu vào Profile (bảng riêng, quan hệ
@@ -36,6 +40,19 @@ class PatientRegisterRequest(BaseModel):
     accuracy_score: Optional[float] = None    # "Độ chính xác"
     completion_score: Optional[float] = None  # "Độ hoàn thành"
     fluency_score: Optional[float] = None     # "Độ trôi chảy"
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_patient_phone(cls, v: str) -> str:
+        """Chuẩn hóa sđt bệnh nhân; không hợp lệ -> 422. Giá trị LƯU = dạng chuẩn hóa."""
+        norm = normalize_phone(v)
+        if norm is None:
+            raise ValueError(
+                "Số điện thoại không hợp lệ (cần số VN 10-11 chữ số, vd 0912345678)"
+            )
+        return norm
+
+    # caregiver_phone (người thân): GIỮ optional, KHÔNG ép định dạng.
 
 
 class TherapistRegisterRequest(BaseModel):

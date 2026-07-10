@@ -61,6 +61,7 @@ def _register_patient() -> str:
             "full_name": "TEST_PATIENT_DO_NOT_USE",
             "email": _unique_email(),
             "password": "secret123",
+            "phone_number": f"09{int(uuid.uuid4().hex[:8], 16) % 10**8:08d}",  # phone BẮT BUỘC (Mô hình A)
             "date_of_birth": "1980-01-01",
             "gender": "male",
             "severity_level": "Trung bình",

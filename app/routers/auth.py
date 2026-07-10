@@ -33,6 +33,7 @@ from app.schemas.auth import (
     TherapistRegisterRequest,
     TokenResponse,
 )
+from app.services.phone_service import normalize_phone
 from app.services.plan_service import create_initial_plan
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -48,9 +49,20 @@ def _email_exists(db: Session, email: str) -> bool:
 
 @router.post("/register/patient", response_model=TokenResponse, status_code=201)
 def register_patient(payload: PatientRegisterRequest, db: Session = Depends(get_db)):
-    """Đăng ký bệnh nhân. Email trùng -> 409. Thành công -> trả token (tự đăng nhập)."""
+    """Đăng ký bệnh nhân. Email trùng -> 409. Sđt trùng bệnh nhân khác -> 409
+    (Mô hình A: claim khớp theo sđt, không cho 2 bệnh nhân trùng số).
+    Thành công -> trả token (tự đăng nhập)."""
     if _email_exists(db, payload.email):
         raise HTTPException(status_code=409, detail="Email đã được đăng ký")
+
+    # Chống trùng số GIỮA CÁC BỆNH NHÂN (payload.phone_number đã chuẩn hóa bởi schema;
+    # dữ liệu cũ trong DB có thể còn dạng thô -> so trên dạng chuẩn hóa cả 2 phía).
+    # TODO(tối ưu): thêm cột phone_normalized + unique index khi dữ liệu lớn.
+    existing_phones = db.query(Patient).filter(Patient.phone_number.isnot(None)).all()
+    if any(
+        normalize_phone(p.phone_number) == payload.phone_number for p in existing_phones
+    ):
+        raise HTTPException(status_code=409, detail="Số điện thoại đã được đăng ký")
 
     patient = Patient(
         full_name=payload.full_name,
