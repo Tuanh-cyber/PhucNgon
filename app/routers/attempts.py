@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.content import CommandAsset, Exercise, VocabularyAsset
-from app.models.enums import CommandMode, UserRole
+from app.models.enums import CommandMode, Topic, UserRole
 from app.models.therapy import ExerciseAssignment, TherapyPlan
 from app.models.user import User
 from app.routers.auth import get_current_user
@@ -129,6 +129,21 @@ async def attempt_preview(
     return AttemptResponse.model_validate(score_result)
 
 
+# Câu hỏi bài "Gọi tên" (naming) theo CHỦ ĐỀ — key = Topic enum value (chuẩn, bền hơn
+# chuỗi hiển thị tiếng Việt). Chủ đề không khớp -> NAMING_PROMPT_DEFAULT.
+# Đặt Ở ĐÂY (nơi duy nhất dựng NamingContent) để chỉnh 1 chỗ. CHỈ áp cho naming;
+# command_identification / sentence_building giữ câu hỏi riêng của chúng.
+NAMING_PROMPT_DEFAULT = "Đây là gì?"
+NAMING_PROMPT_BY_TOPIC: dict[Topic, str] = {
+    Topic.household_item: "Tên của vật này là gì?",      # "Vật dụng"
+    Topic.daily_activity: "Tên của hành động này là gì?",  # "Hoạt động thường ngày"
+    Topic.family:         "Người này được gọi là gì?",    # "Gia đình"
+    Topic.body_part:      "Tên của bộ phận này là gì?",   # "Bộ phận cơ thể"
+    Topic.number:         "Đây là số mấy?",               # "Số đếm"
+    Topic.food_drink:     "Tên của món ăn này là gì?",    # "Ăn uống"
+}
+
+
 def _build_assignment_content(exercise: Exercise, db: Session) -> AssignmentContent:
     """
     Dựng payload nội dung 1 bài để frontend render — KHÔNG chứa đáp án đúng.
@@ -146,6 +161,7 @@ def _build_assignment_content(exercise: Exercise, db: Session) -> AssignmentCont
         return NamingContent(
             image_url=vocab_image_url(vocab),
             vocab_audio_url=vocab_audio_url(vocab),
+            prompt=NAMING_PROMPT_BY_TOPIC.get(exercise.topic, NAMING_PROMPT_DEFAULT),
         )
 
     if exercise_type == "command_identification":

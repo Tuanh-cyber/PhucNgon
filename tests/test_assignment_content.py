@@ -122,7 +122,12 @@ def test_naming_content_has_image_and_no_answer_leak(cleanup_test_users):
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["exercise_type"] == "naming"
-    assert data["prompt"] == "Tên của vật này là gì?"
+    # Câu hỏi naming đổi theo chủ đề của bài -> phải là 1 trong các prompt hợp lệ
+    # (6 chủ đề đã map + default), không còn cố định 1 chuỗi.
+    from app.routers.attempts import NAMING_PROMPT_BY_TOPIC, NAMING_PROMPT_DEFAULT
+
+    valid_prompts = set(NAMING_PROMPT_BY_TOPIC.values()) | {NAMING_PROMPT_DEFAULT}
+    assert data["prompt"] in valid_prompts
     # vocab_audio_url: hoặc null (file thiếu) hoặc /static/vocab-audio/... (đã backfill)
     if data["vocab_audio_url"] is not None:
         assert data["vocab_audio_url"].startswith("/static/vocab-audio/")
