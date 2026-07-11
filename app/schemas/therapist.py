@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from app.schemas.assessment import ProgressDashboardResponse
 
@@ -23,9 +23,10 @@ AphasiaType = Literal[
 
 
 class ClaimPatientRequest(BaseModel):
-    """POST /therapist/patients/claim — bác sĩ NHẬN 1 bệnh nhân đã tự đăng ký (tra theo email)."""
+    """POST /therapist/patients/claim — bác sĩ NHẬN 1 bệnh nhân (khớp theo SỐ ĐIỆN THOẠI
+    đã chuẩn hóa — Mô hình A; nhận mọi định dạng 0912..., +84 91..., có chấm/khoảng trắng)."""
 
-    email: EmailStr
+    phone: str
     aphasia_type: Optional[AphasiaType] = None
     hospital_name: Optional[str] = None
     severity_level: Optional[str] = None

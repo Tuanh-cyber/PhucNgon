@@ -46,6 +46,7 @@ from app.schemas.therapist import (
     TherapistPatientItem,
     TherapistPatientListResponse,
 )
+from app.services.phone_service import normalize_phone
 from app.services.stats_service import (
     _local_date,
     compute_daily_scores,
@@ -104,19 +105,38 @@ def claim_patient(
     db: Session = Depends(get_db),
 ):
     """
-    Gán bệnh nhân (tra theo email) vào bác sĩ đang đăng nhập + điền hồ sơ/baseline.
-    1 transaction. Rẽ 3 nhánh theo plan.therapist_id:
+    Gán bệnh nhân (khớp theo SỐ ĐIỆN THOẠI đã chuẩn hóa — Mô hình A) vào bác sĩ đang
+    đăng nhập + điền hồ sơ/baseline. 1 transaction. Rẽ 3 nhánh theo plan.therapist_id:
       NULL          -> gán tôi ("claimed")
       == tôi        -> idempotent, cập nhật info ("updated")
       == bác sĩ khác -> 409 (KHÔNG lộ tên bác sĩ kia)
     """
     _require_therapist(current_user)
 
-    # Patient joined-inheritance: query Patient tự JOIN users -> lọc thẳng bằng email
-    # kế thừa. Email của therapist/caregiver không nằm trong tập Patient -> None.
-    patient = db.query(Patient).filter(Patient.email == payload.email).first()
-    if patient is None:
-        raise HTTPException(status_code=404, detail="Không tìm thấy bệnh nhân với email này")
+    # Chuẩn hóa số bác sĩ nhập; không ra dạng hợp lệ -> 422 (nói rõ, không âm thầm 404).
+    phone_norm = normalize_phone(payload.phone)
+    if phone_norm is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Số điện thoại không hợp lệ (cần số VN 10-11 chữ số, vd 0912345678 hoặc +84912345678)",
+        )
+
+    # So khớp trên dạng ĐÃ CHUẨN HÓA cả 2 phía (DB đang lưu chuỗi thô đủ kiểu định dạng).
+    # TODO(tối ưu): đang normalize từng dòng trong Python — chấp nhận cho demo (ít bệnh
+    # nhân); dữ liệu lớn thì thêm cột phone_normalized có index, backfill 1 lần.
+    candidates = db.query(Patient).filter(Patient.phone_number.isnot(None)).all()
+    matches = [p for p in candidates if normalize_phone(p.phone_number) == phone_norm]
+
+    if len(matches) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy bệnh nhân với số này (bệnh nhân cần đăng ký kèm SĐT trước)",
+        )
+    if len(matches) > 1:
+        raise HTTPException(
+            status_code=409, detail="Nhiều bệnh nhân trùng số, cần xác định thêm"
+        )
+    patient = matches[0]
 
     plan = (
         db.query(TherapyPlan)
