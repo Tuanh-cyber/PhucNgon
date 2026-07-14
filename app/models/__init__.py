@@ -40,6 +40,7 @@ from app.models.therapy import (
 )
 from app.models.speech import AiFeedback, AphasiaAnalysis, SpeechRecording, Transcription
 from app.models.notification import Notification
+from app.models.appointment import Appointment
 from app.models.report import Report
 
 __all__ = [
@@ -62,5 +63,5 @@ __all__ = [
     "TopicProgress",
     "SpeechRecording", "Transcription", "AphasiaAnalysis", "AiFeedback",
     "Notification",
-    "Report",
+    "Appointment", "Appointment", "Report",
 ]

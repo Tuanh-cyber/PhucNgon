@@ -452,6 +452,40 @@ bệnh nhân có tồn tại hay không.
 
 ---
 
+## 7. Appointments — Lịch hẹn
+
+Múi giờ: backend LƯU + TRẢ UTC (ISO 8601) — frontend tự hiển thị giờ địa phương.
+
+### GET `/patients/me/appointments?from=YYYY-MM-DD&to=YYYY-MM-DD`
+Lịch hẹn của bệnh nhân đang đăng nhập trong khoảng ngày (lọc theo `starts_at`).
+`from`/`to` optional — mặc định: từ đầu THÁNG TRƯỚC đến hết THÁNG SAU. Sắp theo `starts_at`.
+Yêu cầu đăng nhập, role = patient.
+```json
+[
+  {
+    "appointment_id": "uuid",
+    "starts_at": "2026-07-20T02:00:00Z", "ends_at": "2026-07-20T03:00:00Z",
+    "location": "BV Chợ Rẫy", "room": "P.204", "note": "Tái khám định kỳ",
+    "doctor_name": "BS. Trần Thanh Phúc"
+  }
+]
+```
+`room`/`note` có thể `null`. Chưa có lịch -> `[]` (không 404).
+
+### POST `/therapist/patients/{patient_id}/appointments`
+Bác sĩ đặt lịch cho 1 bệnh nhân CỦA MÌNH (mask get_owned_patient — bệnh nhân của bác sĩ
+khác/tự do → **404** đồng nhất). Yêu cầu đăng nhập, role = therapist.
+```json
+{
+  "starts_at": "2026-07-20T02:00:00Z", "ends_at": "2026-07-20T03:00:00Z",
+  "location": "BV Chợ Rẫy", "room": "P.204", "note": "Tái khám định kỳ"
+}
+```
+- `room`/`note` optional. **422** nếu `ends_at <= starts_at`.
+- **200**: trả lịch vừa tạo (shape giống phần tử GET ở trên, kèm `doctor_name` = tên bác sĩ đặt).
+
+---
+
 ## Quy tắc chung cho mọi API
 
 - Mọi lỗi trả về dạng: `{ "detail": "Nội dung lỗi bằng tiếng Việt" }`

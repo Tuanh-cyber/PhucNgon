@@ -9,14 +9,18 @@ GET /patients/me/recommended-exercises: gợi ý 3 loại bài theo profile bệ
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date, datetime, time, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.appointment import Appointment
 from app.models.assessment import Assessment, AssessmentResult
 from app.models.enums import UserRole
-from app.models.user import Patient, User
+from app.models.user import Patient, Therapist, User
 from app.routers.auth import get_current_user
+from app.schemas.appointment import AppointmentItem
 from app.schemas.assessment import (
     PatientProfileResponse,
     InitialAssessmentResponse,
@@ -119,6 +123,58 @@ def get_my_profile(
         aphasia_type=patient.aphasia_type,
         hospital_name=patient.hospital_name,
     )
+
+
+@router.get("/me/appointments", response_model=list[AppointmentItem])
+def get_my_appointments(
+    date_from: date | None = Query(None, alias="from"),
+    date_to: date | None = Query(None, alias="to"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lịch hẹn của bệnh nhân đang đăng nhập trong khoảng ngày [from, to] (theo starts_at).
+    Mặc định: từ đầu THÁNG TRƯỚC đến hết THÁNG SAU (tháng hiện tại ±1).
+    Giờ trả về là UTC (ISO 8601) — frontend tự hiển thị giờ địa phương. Sắp theo starts_at.
+    """
+    if current_user.role != UserRole.patient:
+        raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới xem được lịch hẹn của mình")
+
+    today = date.today()
+    if date_from is None:
+        # ngày 1 của tháng trước
+        date_from = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+    if date_to is None:
+        # ngày cuối của tháng sau = (ngày 1 của tháng+2) - 1
+        first_next = (today.replace(day=1) + timedelta(days=62)).replace(day=1)
+        date_to = first_next - timedelta(days=1)
+
+    start_bound = datetime.combine(date_from, time.min, tzinfo=timezone.utc)
+    end_bound = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=timezone.utc)
+
+    rows = (
+        db.query(Appointment, Therapist)
+        .join(Therapist, Appointment.therapist_id == Therapist.id)
+        .filter(
+            Appointment.patient_id == current_user.id,
+            Appointment.starts_at >= start_bound,
+            Appointment.starts_at < end_bound,
+        )
+        .order_by(Appointment.starts_at)
+        .all()
+    )
+    return [
+        AppointmentItem(
+            appointment_id=str(a.id),
+            starts_at=a.starts_at,
+            ends_at=a.ends_at,
+            location=a.location,
+            room=a.room,
+            note=a.note,
+            doctor_name=t.full_name,
+        )
+        for a, t in rows
+    ]
 
 
 @router.get("/me/progress-dashboard", response_model=ProgressDashboardResponse)

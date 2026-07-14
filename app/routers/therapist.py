@@ -30,9 +30,11 @@ from app.models.enums import (
     SessionStatus,
     UserRole,
 )
+from app.models.appointment import Appointment
 from app.models.therapy import ExerciseSession, TherapyPlan
 from app.models.user import Patient, User
 from app.routers.auth import get_current_user
+from app.schemas.appointment import AppointmentCreateRequest, AppointmentItem
 from app.schemas.assessment import ProgressDashboardResponse
 from app.schemas.therapist import (
     PatientStats3,
@@ -353,6 +355,41 @@ def dashboard_summary(
             round(sum(completions) / len(completions), 1) if completions else None
         ),
         attention_list=attention,
+    )
+
+
+# ── Lịch hẹn: bác sĩ đặt cho bệnh nhân CỦA MÌNH ──────────────────────────────
+@router.post("/patients/{patient_id}/appointments", response_model=AppointmentItem)
+def create_appointment(
+    payload: AppointmentCreateRequest,
+    patient: Patient = Depends(get_owned_patient),  # mask: chỉ bệnh nhân CỦA TÔI (404 nếu không)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Đặt lịch hẹn cho 1 bệnh nhân của tôi. ends_at > starts_at (422 nếu sai — validator schema).
+    Giờ lưu UTC; frontend hiển thị giờ địa phương.
+    """
+    appt = Appointment(
+        patient_id=patient.id,
+        therapist_id=current_user.id,
+        starts_at=payload.starts_at,
+        ends_at=payload.ends_at,
+        location=payload.location,
+        room=payload.room,
+        note=payload.note,
+    )
+    db.add(appt)
+    db.commit()
+    db.refresh(appt)
+    return AppointmentItem(
+        appointment_id=str(appt.id),
+        starts_at=appt.starts_at,
+        ends_at=appt.ends_at,
+        location=appt.location,
+        room=appt.room,
+        note=appt.note,
+        doctor_name=current_user.full_name,
     )
 
 
