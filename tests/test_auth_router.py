@@ -244,3 +244,66 @@ def test_register_patient_caregiver_phone_still_optional(cleanup_test_users):
     payload = _patient_payload(_unique_email())
     payload["caregiver_phone"] = "0987 654 321 (con trai)"
     assert client.post("/auth/register/patient", json=payload).status_code == 201
+
+
+# ── POST /auth/change-password ───────────────────────────────────────────────
+
+def test_change_password_full_flow(cleanup_test_users):
+    """Đổi thành công -> login mật khẩu MỚI ok, mật khẩu CŨ fail 401."""
+    email = _unique_email()
+    reg = client.post("/auth/register/patient", json=_patient_payload(email))
+    token = reg.json()["access_token"]
+
+    r = client.post(
+        "/auth/change-password",
+        json={"current_password": "secret123", "new_password": "matkhaumoi456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    assert "thành công" in r.json()["message"]
+
+    # Mật khẩu MỚI đăng nhập được
+    ok = client.post("/auth/login", json={"email": email, "password": "matkhaumoi456"})
+    assert ok.status_code == 200
+    # Mật khẩu CŨ bị từ chối
+    old = client.post("/auth/login", json={"email": email, "password": "secret123"})
+    assert old.status_code == 401
+
+
+def test_change_password_wrong_current_400(cleanup_test_users):
+    """current_password sai -> 400 'Mật khẩu hiện tại không đúng'; mật khẩu KHÔNG đổi."""
+    email = _unique_email()
+    token = client.post("/auth/register/patient", json=_patient_payload(email)).json()[
+        "access_token"
+    ]
+    r = client.post(
+        "/auth/change-password",
+        json={"current_password": "saibetrom", "new_password": "matkhaumoi456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 400
+    assert "Mật khẩu hiện tại không đúng" in r.json()["detail"]
+    # Mật khẩu cũ vẫn dùng được (không bị đổi lén)
+    assert client.post("/auth/login", json={"email": email, "password": "secret123"}).status_code == 200
+
+
+def test_change_password_unauthenticated_401():
+    r = client.post(
+        "/auth/change-password",
+        json={"current_password": "x", "new_password": "matkhaumoi456"},
+    )
+    assert r.status_code == 401
+
+
+def test_change_password_too_short_422(cleanup_test_users):
+    """new_password < 6 ký tự -> 422 (Pydantic min_length)."""
+    email = _unique_email()
+    token = client.post("/auth/register/patient", json=_patient_payload(email)).json()[
+        "access_token"
+    ]
+    r = client.post(
+        "/auth/change-password",
+        json={"current_password": "secret123", "new_password": "abc"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422

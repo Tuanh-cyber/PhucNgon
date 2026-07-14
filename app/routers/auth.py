@@ -27,6 +27,8 @@ from app.models.assessment import Assessment, AssessmentResult
 from app.models.enums import AssessmentStatus, AssessmentType
 from app.models.user import Patient, Profile, Therapist, User
 from app.schemas.auth import (
+    ChangePasswordRequest,
+    ChangePasswordResponse,
     LoginRequest,
     MeResponse,
     PatientRegisterRequest,
@@ -207,6 +209,26 @@ def get_current_user(
         raise credentials_error
 
     return user
+
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    User ĐANG ĐĂNG NHẬP tự đổi mật khẩu của CHÍNH MÌNH (mọi role).
+    Danh tính lấy từ token (get_current_user) — không nhận user_id từ client,
+    nên không thể đổi mật khẩu người khác.
+    Sai current_password -> 400 (xác minh bằng verify_password như login).
+    """
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Mật khẩu hiện tại không đúng")
+
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return ChangePasswordResponse(message="Đổi mật khẩu thành công")
 
 
 @router.get("/me", response_model=MeResponse)

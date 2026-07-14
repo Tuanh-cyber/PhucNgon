@@ -56,6 +56,17 @@ Tương tự, cho bác sĩ. Field riêng: `license_no` (bắt buộc), `speciali
 ```
 **200:** giống response register. **401:** sai email/mật khẩu (message chung chung, không nói rõ sai cái nào).
 
+### POST `/auth/change-password`
+User ĐANG ĐĂNG NHẬP tự đổi mật khẩu của mình (mọi role). Yêu cầu header
+`Authorization: Bearer <token>` — danh tính lấy từ token, KHÔNG đổi được mật khẩu người khác.
+```json
+{ "current_password": "matkhau123", "new_password": "matkhaumoi456" }
+```
+**200:** `{ "message": "Đổi mật khẩu thành công" }` — sau đó đăng nhập bằng mật khẩu MỚI,
+mật khẩu cũ hết hiệu lực (token đã cấp vẫn sống tới khi hết hạn).
+**400:** `current_password` sai — "Mật khẩu hiện tại không đúng".
+**401:** chưa đăng nhập / token hết hạn. **422:** `new_password` dưới 6 ký tự.
+
 ### GET `/auth/me`
 Yêu cầu header `Authorization: Bearer <token>`.
 Dùng để kiểm tra token còn hợp lệ mỗi lần mở app — **200 → vào thẳng Trang chủ, 401 → hiện màn đăng nhập**.

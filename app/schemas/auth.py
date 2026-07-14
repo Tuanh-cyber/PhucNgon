@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.enums import Gender
 from app.services.phone_service import normalize_phone
@@ -88,3 +88,17 @@ class MeResponse(BaseModel):
     full_name: str
     email: EmailStr
     role: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """POST /auth/change-password — user ĐANG ĐĂNG NHẬP tự đổi mật khẩu của mình (mọi role).
+
+    new_password tối thiểu 6 ký tự (đăng ký hiện CHƯA có rule độ dài — áp ở đây trước,
+    đồng bộ ngược cho register sau nếu team chốt)."""
+
+    current_password: str
+    new_password: str = Field(min_length=6)
+
+
+class ChangePasswordResponse(BaseModel):
+    message: str
