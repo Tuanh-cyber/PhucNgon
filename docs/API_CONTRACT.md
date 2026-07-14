@@ -109,6 +109,17 @@ role = patient. `aphasia_type` của patient → profile: chứa "Broca" → `br
 `recommended = weight >= 0.3`. CHỈ để hiển thị gợi ý — logic giao bài thật KHÔNG đổi
 (vẫn 10 bài/loại).
 
+### GET `/patients/me/profile`
+Hồ sơ của bệnh nhân đang đăng nhập — màn "Tài khoản" (chỉ xem). Yêu cầu đăng nhập, role = patient.
+```json
+{
+  "full_name": "Huỳnh Đình Phúc Hào", "email": "hao@example.com",
+  "phone_number": "0912345678", "date_of_birth": "1962-01-01", "gender": "male",
+  "severity_level": "Trung bình", "aphasia_type": "Broca", "hospital_name": "BV Chợ Rẫy"
+}
+```
+`phone_number/severity_level/aphasia_type/hospital_name` có thể `null`.
+
 ### GET `/patients/me/stats`
 3 chỉ số TÍNH TỰ ĐỘNG từ lịch sử làm bài thật (khác initial-assessment là số bác sĩ nhập tay).
 Yêu cầu đăng nhập, role = patient.

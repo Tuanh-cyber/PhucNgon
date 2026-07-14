@@ -18,6 +18,7 @@ from app.models.enums import UserRole
 from app.models.user import Patient, User
 from app.routers.auth import get_current_user
 from app.schemas.assessment import (
+    PatientProfileResponse,
     InitialAssessmentResponse,
     PatientStatsResponse,
     ProgressDashboardResponse,
@@ -96,6 +97,28 @@ def get_my_stats(
 
     stats = compute_patient_stats(db, current_user.id)
     return PatientStatsResponse(**stats)
+
+
+@router.get("/me/profile", response_model=PatientProfileResponse)
+def get_my_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Hồ sơ của patient đang đăng nhập — màn 'Tài khoản' app bệnh nhân (chỉ xem)."""
+    if current_user.role != UserRole.patient:
+        raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới xem được hồ sơ của mình")
+
+    patient = db.query(Patient).filter(Patient.id == current_user.id).one()
+    return PatientProfileResponse(
+        full_name=patient.full_name,
+        email=patient.email,
+        phone_number=patient.phone_number,
+        date_of_birth=patient.date_of_birth.isoformat(),
+        gender=patient.gender.value,
+        severity_level=patient.severity_level,
+        aphasia_type=patient.aphasia_type,
+        hospital_name=patient.hospital_name,
+    )
 
 
 @router.get("/me/progress-dashboard", response_model=ProgressDashboardResponse)

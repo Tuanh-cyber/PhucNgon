@@ -112,3 +112,22 @@ def test_register_without_baseline_scores_returns_nulls(cleanup_test_users):
     assert data["fluency_score"] is None
     # 4 field chẩn đoán vẫn trả về bình thường
     assert data["aphasia_type"] == "broca"
+
+
+def test_get_my_profile(cleanup_test_users):
+    """GET /patients/me/profile trả đủ hồ sơ (màn Tài khoản)."""
+    email = _unique_email()
+    payload = _patient_payload(email)
+    reg = client.post("/auth/register/patient", json=payload)
+    token = reg.json()["access_token"]
+
+    r = client.get("/patients/me/profile", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["email"] == email
+    assert data["full_name"] == payload["full_name"]
+    assert data["phone_number"] == payload["phone_number"]  # đã chuẩn hóa = giữ nguyên dạng 0...
+    assert data["date_of_birth"] == payload["date_of_birth"]
+    assert data["gender"] == payload["gender"]
+    # Chưa đăng nhập -> 401
+    assert client.get("/patients/me/profile").status_code == 401

@@ -40,6 +40,19 @@ class PatientStatsResponse(BaseModel):
     fluency_score: Optional[float]
 
 
+class PatientProfileResponse(BaseModel):
+    """GET /patients/me/profile — hồ sơ hiển thị ở màn 'Tài khoản' (chỉ xem)."""
+
+    full_name: str
+    email: str
+    phone_number: Optional[str]
+    date_of_birth: str              # ISO YYYY-MM-DD
+    gender: str                     # male | female | other
+    severity_level: Optional[str]
+    aphasia_type: Optional[str]
+    hospital_name: Optional[str]
+
+
 # ── Dashboard tiến trình (GET /patients/me/progress-dashboard) ────────────────
 class DailyScore(BaseModel):
     """Điểm trung bình 1 ngày (biểu đồ đường 7 ngày). avg_score=None = ngày không tập."""
