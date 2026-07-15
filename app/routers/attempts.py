@@ -19,9 +19,11 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.content import CommandAsset, Exercise, VocabularyAsset
 from app.models.enums import CommandMode, Topic, UserRole
-from app.models.therapy import ExerciseAssignment, TherapyPlan
+from app.models.therapy import ExerciseAssignment, ExerciseSession, TherapyPlan
+from app.models.therapy_session import TherapySession
 from app.models.user import User
 from app.routers.auth import get_current_user
+from app.routers.sessions import compute_session_counters
 from app.schemas.attempt import (
     AttemptResponse,
     AttemptSubmitResponse,
@@ -275,6 +277,7 @@ async def submit_assignment_attempt(
     assignment_id: uuid.UUID,
     audio_file: Optional[UploadFile] = File(default=None),
     selected_vocab_id: Optional[str] = Form(default=None),
+    therapy_session_id: Optional[str] = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -283,11 +286,34 @@ async def submit_assignment_attempt(
 
     - Yêu cầu đăng nhập, role phải là patient (403 nếu không).
     - Bài speech: gửi audio_file. CMD recognition: gửi selected_vocab_id.
+    - therapy_session_id (OPTIONAL — rule.md phiên 10 bài): có gửi -> gắn lượt làm vào
+      phiên + cập nhật tiến độ phiên. KHÔNG gửi -> luồng cũ, chạy y như trước.
     """
     if current_user.role != UserRole.patient:
         raise HTTPException(
             status_code=403, detail="Chỉ bệnh nhân mới được nộp bài của mình"
         )
+
+    # Validate phiên TRƯỚC KHI chấm (tránh chấm xong mới báo lỗi phiên).
+    therapy_session = None
+    if therapy_session_id is not None:
+        try:
+            ts_uuid = uuid.UUID(therapy_session_id)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="therapy_session_id không hợp lệ")
+        therapy_session = (
+            db.query(TherapySession)
+            .filter(
+                TherapySession.id == ts_uuid,
+                TherapySession.patient_id == current_user.id,
+                TherapySession.status == "in_progress",
+            )
+            .first()
+        )
+        if therapy_session is None:
+            raise HTTPException(
+                status_code=404, detail="Không tìm thấy phiên tập đang mở"
+            )
 
     wav_bytes = await audio_file.read() if audio_file is not None else None
 
@@ -315,6 +341,18 @@ async def submit_assignment_attempt(
             detail="Dịch vụ nhận diện giọng nói tạm thời không khả dụng. "
             "Vui lòng thử lại sau.",
         )
+
+    # Gắn lượt làm vào PHIÊN (nếu submit kèm therapy_session_id) + cập nhật tiến độ phiên.
+    # Nằm SAU submit thành công, KHÔNG đụng logic chấm/level cũ — chỉ set FK + counters.
+    if therapy_session is not None:
+        ex_session = (
+            db.query(ExerciseSession).filter(ExerciseSession.id == saved.session_id).one()
+        )
+        ex_session.therapy_session_id = therapy_session.id
+        completed, retry = compute_session_counters(db, therapy_session.id)
+        therapy_session.completed_count = completed
+        therapy_session.total_retry_count = retry
+        db.commit()
 
     # 3 tiêu chí RIÊNG lượt này — CÙNG hàm attempt_to_metrics với /patients/me/stats.
     metrics = attempt_to_metrics(saved.score, saved.components, saved.result.value)

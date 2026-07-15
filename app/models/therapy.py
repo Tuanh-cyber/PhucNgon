@@ -141,6 +141,11 @@ class ExerciseSession(Base):
     patient_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False
     )
+    # PHIÊN tập (rule.md mục 3) chứa bài này — NULLABLE: luồng cũ/dữ liệu cũ không có
+    # phiên vẫn hợp lệ y nguyên. Chỉ gắn khi submit kèm therapy_session_id.
+    therapy_session_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("therapy_sessions.id")
+    )
     started_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     completed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True))
     status: Mapped[SessionStatus] = mapped_column(
