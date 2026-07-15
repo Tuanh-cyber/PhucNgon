@@ -26,7 +26,6 @@ from app.models.therapy import (
     ExerciseSession,
     SessionResult,
     TherapyPlan,
-    TopicProgress,
 )
 from app.models.therapy_session import TherapySession
 from app.models.user import User
@@ -109,10 +108,14 @@ def start_session(
 ):
     """
     Tạo phiên (rule.md: Select Mode -> Select Topic -> 10 exercises).
-    - topic bỏ trống = Mixed Topics (trộn mọi chủ đề; vocab_level=None — level theo từng bài).
-    - Chọn bài: từ plan active, đúng dạng/chủ đề, ƯU TIÊN bài CHƯA làm xong, lấy 10 bài.
-      mode="mixed": trộn ĐỀU 3 dạng, seed ổn định trong ngày.
-      TODO(Giai đoạn 3): áp weighted theo profile (PROFILE_EXERCISE_WEIGHTS: Broca 70/30/0...).
+    - topic bỏ trống = Mixed Topics (trộn mọi chủ đề).
+    - CHỌN BÀI TỪ NGÂN HÀNG Exercise (mọi vocab_level — KHÔNG lọc level: nâng level đang
+      NGỦ ĐÔNG vì vocab theo level quá thưa, xem LEVELING_ENABLED ở session_service).
+      Bài nào chưa có trong plan -> tự tạo ExerciseAssignment (get-or-create) để luồng
+      submit giữ nguyên (vẫn assignment-based).
+    - Ưu tiên bài CHƯA làm xong; trộn ổn định trong ngày; <10 bài khả dụng -> lấy tối đa
+      (không lặp bài, không lỗi — mỗi topic ~15 vocab nên thực tế đủ 10).
+      TODO(Giai đoạn 3): mode="mixed" áp weighted theo profile (Broca 70/30/0...).
     """
     _require_patient(current_user)
 
@@ -139,48 +142,64 @@ def start_session(
     if plan is None:
         raise HTTPException(status_code=404, detail="Chưa có kế hoạch trị liệu")
 
-    # Lấy assignment đúng dạng/chủ đề (tái dùng đúng kiểu lọc của /plans/me/assignments)
+    # ── Chọn bài từ NGÂN HÀNG (mọi level) ──
     types = (
         list(ExerciseType) if payload.mode == "mixed" else [ExerciseType(payload.mode)]
     )
-    q = (
-        db.query(ExerciseAssignment, Exercise)
-        .join(Exercise, ExerciseAssignment.exercise_id == Exercise.id)
-        .filter(
-            ExerciseAssignment.plan_id == plan.id,
-            Exercise.exercise_type.in_(types),
-        )
+    q = db.query(Exercise).filter(
+        Exercise.exercise_type.in_(types), Exercise.is_active.is_(True)
     )
     if topic_enum is not None:
         q = q.filter(Exercise.topic == topic_enum)
-    rows = q.order_by(ExerciseAssignment.order_index).all()
-    if not rows:
+    bank = q.order_by(Exercise.exercise_code).all()
+    if not bank:
         raise HTTPException(status_code=409, detail="Không có bài nào cho lựa chọn này")
 
-    graded_ids = _graded_assignment_ids(db, [a.id for a, _ in rows])
+    # Trộn ổn-định-trong-ngày (mọi mode — thứ tự bank vốn không có ý nghĩa với bệnh nhân)
+    seed = f"{current_user.id}:{payload.mode}:{payload.topic or 'all'}:{date.today().isoformat()}"
+    random.Random(seed).shuffle(bank)
 
-    # mode=mixed: trộn đều ổn-định-trong-ngày (cùng seed logic /plans/me/assignments).
-    if payload.mode == "mixed":
-        seed = f"{current_user.id}:{payload.topic or 'all'}:{date.today().isoformat()}"
-        random.Random(seed).shuffle(rows)
-
-    # Ưu tiên bài CHƯA làm xong, rồi mới tới bài đã xong -> lấy 10
-    pending = [(a, e) for a, e in rows if a.id not in graded_ids]
-    done = [(a, e) for a, e in rows if a.id in graded_ids]
-    picked = (pending + done)[:PLANNED_COUNT]
-
-    # vocab_level lúc bắt đầu: theo TopicProgress của topic; Mixed Topics -> None (per-bài)
-    vocab_level: int | None = None
-    if topic_enum is not None:
-        progress = (
-            db.query(TopicProgress)
-            .filter(
-                TopicProgress.patient_id == current_user.id,
-                TopicProgress.topic == topic_enum,
-            )
-            .first()
+    # Assignment hiện có của plan cho các exercise này (để get-or-create + biết bài đã xong)
+    existing = {
+        a.exercise_id: a
+        for a in db.query(ExerciseAssignment)
+        .filter(
+            ExerciseAssignment.plan_id == plan.id,
+            ExerciseAssignment.exercise_id.in_([e.id for e in bank]),
         )
-        vocab_level = progress.current_level if progress else 1
+        .all()
+    }
+    graded_ids = _graded_assignment_ids(
+        db, [a.id for a in existing.values()]
+    )
+
+    def _is_done(e: Exercise) -> bool:
+        a = existing.get(e.id)
+        return a is not None and a.id in graded_ids
+
+    # Ưu tiên bài CHƯA làm xong; <10 -> lấy tối đa có thể (KHÔNG lặp bài)
+    ordered = [e for e in bank if not _is_done(e)] + [e for e in bank if _is_done(e)]
+    picked_exercises = ordered[:PLANNED_COUNT]
+
+    # get-or-create ExerciseAssignment cho bài chưa có trong plan
+    next_index = (
+        db.query(ExerciseAssignment)
+        .filter(ExerciseAssignment.plan_id == plan.id)
+        .count()
+    )
+    picked: list[tuple[ExerciseAssignment, Exercise]] = []
+    for e in picked_exercises:
+        a = existing.get(e.id)
+        if a is None:
+            a = ExerciseAssignment(plan_id=plan.id, exercise_id=e.id, order_index=next_index)
+            next_index += 1
+            db.add(a)
+            db.flush()
+        picked.append((a, e))
+
+    # vocab_level: KHÔNG còn dùng để lọc (nâng level ngủ đông) -> luôn None.
+    # Giữ cột để bật lại sau; TopicProgress không bị đọc ở đây nữa.
+    vocab_level: int | None = None
 
     ts = TherapySession(
         patient_id=current_user.id,

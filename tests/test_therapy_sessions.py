@@ -147,7 +147,8 @@ def test_session_submit_finish_stopped_early(cleanup_test_data):
 
 
 def test_session_with_topic_has_vocab_level(cleanup_test_data):
-    """start với topic cụ thể -> vocab_level = level TopicProgress (mặc định 1)."""
+    """start với topic cụ thể -> vocab_level=None (nâng level NGỦ ĐÔNG — chọn bài từ
+    ngân hàng MỌI level, không lọc; xem LEVELING_ENABLED ở session_service)."""
     pat = _register_patient()
     # Tìm 1 topic có bài naming trong plan
     topics = client.get("/plans/me/topics?type=naming", headers=_auth(pat["token"])).json()
@@ -159,7 +160,7 @@ def test_session_with_topic_has_vocab_level(cleanup_test_data):
     )
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["vocab_level"] == 1                 # chưa có TopicProgress -> level 1
+    assert data["vocab_level"] is None              # nâng level ngủ đông -> không lọc level
     assert all(e["topic"] == topic for e in data["exercises"])
     assert all(e["exercise_type"] == "naming" for e in data["exercises"])
 
@@ -212,3 +213,50 @@ def test_session_isolation_and_validation(cleanup_test_data):
         headers=_auth(p1["token"]),
     )
     assert r2.status_code == 404
+
+
+def test_all_topics_give_full_10_naming(cleanup_test_data):
+    """SAU khi bỏ lọc level: MỌI topic (kể cả 'Gia đình'/'Số đếm' trước đây kẹt ở level
+    cao) đều dựng được phiên naming ĐỦ 10 bài — chọn thẳng từ ngân hàng mọi level."""
+    pat = _register_patient()
+    all_topics = ["daily_activity", "food_drink", "household_item", "family", "body_part", "number"]
+    for topic in all_topics:
+        r = client.post(
+            "/sessions/start", json={"mode": "naming", "topic": topic}, headers=_auth(pat["token"])
+        )
+        assert r.status_code == 200, f"{topic}: {r.text}"
+        data = r.json()
+        assert len(data["exercises"]) == 10, f"{topic} chỉ có {len(data['exercises'])} bài"
+        assert all(e["topic"] == topic for e in data["exercises"])
+
+
+def test_leveling_dormant_no_levelup_response(cleanup_test_data):
+    """Nâng level NGỦ ĐÔNG: submit bài graded -> leveled_up luôn False, TopicProgress
+    KHÔNG được tạo (bộ máy không chạy khi cờ tắt)."""
+    from app.models.therapy import TopicProgress
+
+    pat = _register_patient()
+    start = client.post(
+        "/sessions/start", json={"mode": "command_identification"}, headers=_auth(pat["token"])
+    ).json()
+    recogs = _recognition_assignments(pat["token"], start["exercises"])
+    assert recogs
+    content = client.get(
+        f"/assignments/{recogs[0]['assignment_id']}/content", headers=_auth(pat["token"])
+    ).json()
+    r = client.post(
+        f"/assignments/{recogs[0]['assignment_id']}/submit",
+        data={"selected_vocab_id": content["choices"][0]["vocab_id"]},
+        headers=_auth(pat["token"]),
+    )
+    assert r.status_code == 200
+    assert r.json()["leveled_up"] is False
+    assert r.json()["new_level"] is None
+
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.email == pat["email"]).one()
+        n = db.query(TopicProgress).filter(TopicProgress.patient_id == u.id).count()
+        assert n == 0  # cờ tắt -> không ghi TopicProgress
+    finally:
+        db.close()

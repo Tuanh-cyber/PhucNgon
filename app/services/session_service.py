@@ -370,6 +370,15 @@ FINAL_RESULT_LABELS = frozenset({"pass", "correct", "incorrect", "skip"})
 HIGH_SCORE_THRESHOLD = 80.0
 CONSECUTIVE_HIGH_SCORES_TO_LEVEL_UP = 3
 
+# ── NÂNG LEVEL: NGỦ ĐÔNG (tạm tắt) ───────────────────────────────────────────
+# Lý do: dữ liệu vocab theo level quá thưa ("Gia đình"/"Số đếm" chỉ 1 từ ở level 3)
+# -> không đủ dựng phiên 10 bài ở level cao. BẬT LẠI = đổi cờ này thành True khi có
+# đủ vocab. Bảng topic_progress + _update_topic_progress GIỮ NGUYÊN (không xóa) —
+# test_progression vẫn phủ bộ máy này (gọi hàm trực tiếp / monkeypatch cờ True).
+# Khi tắt: submit không cập nhật TopicProgress, không giao thêm bài level cao,
+# response luôn leveled_up=False -> FE tự ẩn banner "lên Level".
+LEVELING_ENABLED = False
+
 
 def _update_topic_progress(
     db_session: Session,
@@ -615,8 +624,9 @@ def submit_attempt(
     # 6b. Progression theo topic (rule.md): CHỈ tính khi lượt bài KẾT THÚC (graded) —
     # attempt retry giữa chừng (SEN) chưa phải "hoàn thành 1 bài" nên không tính streak.
     # Cùng transaction với SessionResult: lên level + giao bài mới commit chung 1 lần.
+    # LEVELING_ENABLED=False (ngủ đông): bỏ qua hoàn toàn — xem chú thích ở constant.
     progression = {"leveled_up": False, "new_level": None}
-    if is_final:
+    if is_final and LEVELING_ENABLED:
         progression = _update_topic_progress(
             db_session,
             patient=patient,

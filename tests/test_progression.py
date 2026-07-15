@@ -190,7 +190,12 @@ def test_level_caps_at_3(cleanup_test_data):
 
 def test_submit_attempt_wires_progression(cleanup_test_data, monkeypatch):
     """Tích hợp: nộp bài graded qua submit_attempt -> TopicProgress được tạo cho topic đó
-    và return có progression dict đúng hình dạng."""
+    và return có progression dict đúng hình dạng.
+
+    LEVELING_ENABLED mặc định False (ngủ đông) -> monkeypatch True để test BỘ MÁY
+    vẫn nối dây đúng khi bật lại (bảng + hàm không bị xóa)."""
+    from app.services import session_service as ss
+    monkeypatch.setattr(ss, "LEVELING_ENABLED", True)
     email = _register_patient()
     db = SessionLocal()
     try:

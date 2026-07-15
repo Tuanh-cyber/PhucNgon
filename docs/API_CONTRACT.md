@@ -498,8 +498,10 @@ luồng cũ, chạy y nguyên. Cả 3 endpoint yêu cầu role = patient.
 ```
 - `mode` ∈ `naming|command_identification|sentence_building|mixed`. `topic` optional —
   bỏ trống = **Mixed Topics** (trộn mọi chủ đề); giá trị lạ → 422.
-- Chọn 10 bài từ plan active (ưu tiên bài CHƯA làm xong); `mode=mixed` trộn đều 3 dạng,
-  ổn định trong ngày (TODO: weighted theo profile ở giai đoạn sau).
+- Chọn 10 bài từ NGÂN HÀNG bài tập (MỌI vocab_level — nâng level đang TẠM TẮT vì dữ liệu
+  vocab theo level quá thưa; xem ghi chú cuối mục). Ưu tiên bài CHƯA làm xong; trộn ổn định
+  trong ngày; combo có <10 bài -> trả tối đa số bài thực có (không lỗi, không lặp bài).
+  `mode=mixed` trộn đều 3 dạng (TODO: weighted theo profile ở giai đoạn sau).
 
 **200:**
 ```json
@@ -511,8 +513,8 @@ luồng cũ, chạy y nguyên. Cả 3 endpoint yêu cầu role = patient.
 }
 ```
 - `profile`: snapshot lúc tạo phiên (`broca_like|wernicke_like|mixed` — suy từ aphasia_type).
-- `vocab_level`: level TopicProgress của topic lúc bắt đầu; `null` khi Mixed Topics
-  (level theo TỪNG BÀI — topic của bài nào lấy level topic đó).
+- `vocab_level`: LUÔN `null` hiện tại — nâng level TẠM TẮT (dormant), phiên không lọc
+  theo level nữa. Field giữ lại để bật lại sau.
 **404** chưa có plan; **409** không có bài nào cho lựa chọn.
 
 ### POST `/assignments/{id}/submit` — field mới (optional)
@@ -537,6 +539,10 @@ Phiên đã kết thúc → **409**. Response = shape GET dưới đây.
 - `completed_count` = số bài ĐÃ KẾT THÚC (graded) trong phiên → hiển thị "x/10".
 - `total_retry_count` = tổng số lượt làm THÊM (sau lượt đầu) của mọi bài trong phiên.
 - Counters TÍNH LẠI TỪ DB (không drift). Phiên của người khác → **404**.
+
+⚠️ **Nâng level (rule R5) TẠM TẮT** (`LEVELING_ENABLED=False` backend): submit luôn trả
+`leveled_up=false, new_level=null`; TopicProgress không cập nhật; không giao thêm bài level
+cao. Bảng + logic giữ nguyên để bật lại khi đủ vocab theo level.
 
 ---
 
