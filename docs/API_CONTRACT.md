@@ -546,6 +546,28 @@ cao. Bảng + logic giữ nguyên để bật lại khi đủ vocab theo level.
 
 ---
 
+## 9. Logic Sequence — dạng bài MỚI (ĐANG XÂY — Giai đoạn 1: dữ liệu + assets)
+
+Dạng bài sắp xếp 3-5 ảnh theo đúng trình tự hành động (kéo-thả). KHÁC modality bài nói:
+KHÔNG ASR, không topic, chấm bằng SO THỨ TỰ.
+
+**Trạng thái:** GĐ1 xong (bảng `sequences`/`sequence_steps`/`logic_sequence_exercises` +
+seed 13 sequences / 50 steps / 13 exercises + assets tĩnh). **CHƯA có endpoint** — GĐ2 sẽ
+thêm content/submit.
+
+**Công thức điểm ĐÃ CHỐT (GĐ2 sẽ hiện thực):** NHỊ PHÂN — submitted order khớp HOÀN TOÀN
+`step_order` -> `score=100`; sai dù 1 vị trí -> `score=0`. Đi đường "non-weight" (điểm đơn
+ghi thẳng `SessionResult.score`, KHÔNG có 3 thành phần accuracy/completion/fluency —
+giống nhánh CMD recognition hiện tại; không cần bảng kết quả mới).
+
+**Assets tĩnh (đã phục vụ):**
+- Ảnh bước: `/static/sequence/level{1|2|3}/{image_file}` (vd `/static/sequence/level1/plant1.jpg`)
+- Audio hướng dẫn chung: `/static/sequence/instruction_audio.wav`
+  ("Hãy sắp xếp các hình sau theo đúng trình tự hành động.")
+- Level 1 = 3 bước, level 2 = 4 bước, level 3 = 5 bước.
+
+---
+
 ## Quy tắc chung cho mọi API
 
 - Mọi lỗi trả về dạng: `{ "detail": "Nội dung lỗi bằng tiếng Việt" }`

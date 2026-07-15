@@ -55,6 +55,7 @@ _STATIC_MOUNTS = [
     ("/static/command-audio", "command_audio_wav"),
     ("/static/sentence-audio", "sentence_instance_wav"),
     ("/static/vocab-audio", "Vocab"),
+    ("/static/sequence", "sequence"),  # Logic Sequence: ảnh level{N}/ + instruction_audio.wav
 ]
 for _route, _dirname in _STATIC_MOUNTS:
     _dir = Path(settings.STATIC_ASSETS_BASE_DIR) / _dirname

@@ -19,6 +19,7 @@ from urllib.parse import quote
 
 from app.core.config import settings
 from app.models.content import CommandAsset, SentenceInstanceAsset, VocabularyAsset
+from app.models.sequence import SequenceStep
 
 # Tên thư mục con ảnh theo topic — khớp cấu trúc thật của Picture/ trên đĩa.
 TOPIC_PICTURE_FOLDER: dict[str, str] = {
@@ -35,6 +36,7 @@ _PICTURES_ROUTE, _PICTURES_DIR = "/static/pictures", "Picture"
 _CMD_AUDIO_ROUTE, _CMD_AUDIO_DIR = "/static/command-audio", "command_audio_wav"
 _SENT_AUDIO_ROUTE, _SENT_AUDIO_DIR = "/static/sentence-audio", "sentence_instance_wav"
 _VOCAB_AUDIO_ROUTE, _VOCAB_AUDIO_DIR = "/static/vocab-audio", "Vocab"
+_SEQUENCE_ROUTE, _SEQUENCE_DIR = "/static/sequence", "sequence"  # Logic Sequence
 
 
 def _base_dir() -> Path:
@@ -84,3 +86,19 @@ def sentence_audio_url(si: Optional[SentenceInstanceAsset]) -> Optional[str]:
     if si is None or not si.audio_file:
         return None
     return _url_if_exists(_SENT_AUDIO_ROUTE, _SENT_AUDIO_DIR, si.audio_file)
+
+
+# ── Logic Sequence (dạng bài mới) ─────────────────────────────────────────────
+def sequence_image_url(step: Optional["SequenceStep"]) -> Optional[str]:
+    """URL ảnh 1 bước: /static/sequence/level{level}/{image_file}. Thiếu file -> None."""
+    if step is None or not step.image_file:
+        return None
+    level = step.sequence.level if step.sequence is not None else None
+    if level is None:
+        return None
+    return _url_if_exists(_SEQUENCE_ROUTE, _SEQUENCE_DIR, f"level{level}", step.image_file)
+
+
+def instruction_audio_url() -> Optional[str]:
+    """URL audio hướng dẫn chung cho mọi bài logic_sequence. Thiếu file -> None."""
+    return _url_if_exists(_SEQUENCE_ROUTE, _SEQUENCE_DIR, "instruction_audio.wav")
