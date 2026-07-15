@@ -131,11 +131,18 @@ class ExerciseSession(Base):
         default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
-    # Composition FK from assignment
-    assignment_id: Mapped[uuid.UUID] = mapped_column(
+    # Composition FK from assignment. NULLABLE từ GĐ2 logic_sequence: bài sắp xếp ảnh
+    # nằm ở bảng riêng (logic_sequence_exercises), KHÔNG có assignment — khi đó
+    # logic_sequence_exercise_id bên dưới được set thay thế. Bài NÓI luôn có assignment
+    # (code cũ không đổi); mọi dòng cũ đều đã có giá trị.
+    assignment_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("exercise_assignments.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+    )
+    # Bài logic_sequence của lượt làm này (nullable — bài nói để NULL).
+    logic_sequence_exercise_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("logic_sequence_exercises.id")
     )
     # Denormalized association FK for efficient patient-scoped queries
     patient_id: Mapped[uuid.UUID] = mapped_column(

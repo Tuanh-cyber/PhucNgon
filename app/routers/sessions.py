@@ -99,6 +99,68 @@ def _state_response(ts: TherapySession) -> SessionStateResponse:
     )
 
 
+def _start_logic_sequence_session(db: Session, current_user: User) -> SessionStartResponse:
+    """Phiên logic_sequence: 10/13 bài sắp xếp, trộn seed ổn định trong ngày, mọi level."""
+    from app.models.sequence import LogicSequenceExercise  # import cục bộ: tránh vòng
+
+    bank = db.query(LogicSequenceExercise).order_by(LogicSequenceExercise.exercise_code).all()
+    if not bank:
+        raise HTTPException(status_code=409, detail="Chưa có bài sắp xếp nào (chưa seed)")
+
+    seed = f"{current_user.id}:logic_sequence:{date.today().isoformat()}"
+    random.Random(seed).shuffle(bank)
+
+    # Ưu tiên bài CHƯA hoàn thành (chưa có ExerciseSession graded của bài đó)
+    done_ids = {
+        row[0]
+        for row in db.query(ExerciseSession.logic_sequence_exercise_id)
+        .filter(
+            ExerciseSession.patient_id == current_user.id,
+            ExerciseSession.logic_sequence_exercise_id.isnot(None),
+            ExerciseSession.status == SessionStatus.graded,
+        )
+        .distinct()
+        .all()
+    }
+    ordered = [e for e in bank if e.id not in done_ids] + [e for e in bank if e.id in done_ids]
+    picked = ordered[:PLANNED_COUNT]  # 13 >= 10 -> đủ; nếu ít hơn lấy tối đa
+
+    ts = TherapySession(
+        patient_id=current_user.id,
+        mode="logic_sequence",
+        topic=None,                 # không áp dụng topic
+        vocab_level=None,           # không áp dụng level (leveling ngủ đông)
+        profile=aphasia_type_to_profile(getattr(current_user, "aphasia_type", None)),
+        started_at=datetime.now(timezone.utc),
+        status="in_progress",
+        planned_count=PLANNED_COUNT,
+    )
+    db.add(ts)
+    db.commit()
+    db.refresh(ts)
+
+    return SessionStartResponse(
+        session_id=str(ts.id),
+        mode="logic_sequence",
+        topic=None,
+        vocab_level=None,
+        profile=ts.profile,
+        planned_count=ts.planned_count,
+        exercises=[
+            AssignmentListItem(
+                assignment_id=str(e.id),  # không có assignment — set trùng exercise_id
+                exercise_id=str(e.id),
+                exercise_type="logic_sequence",
+                topic="",
+                order_index=i,
+                status="completed" if e.id in done_ids else "pending",
+                exercise_kind="logic_sequence",
+            )
+            for i, e in enumerate(picked)
+        ],
+    )
+
+
 # ── (a) Bắt đầu phiên: chọn mode + topic -> 10 bài ───────────────────────────
 @router.post("/start", response_model=SessionStartResponse)
 def start_session(
@@ -118,6 +180,13 @@ def start_session(
       TODO(Giai đoạn 3): mode="mixed" áp weighted theo profile (Broca 70/30/0...).
     """
     _require_patient(current_user)
+
+    # ── MODE logic_sequence: modality riêng — KHÔNG topic, KHÔNG assignment/plan ──
+    # Chọn 10 từ 13 bài sắp xếp (trộn mọi level — leveling ngủ đông), seed ổn định
+    # trong ngày. exercises[] trả exercise_kind="logic_sequence" để FE render màn
+    # kéo-thả; FE gọi GET/POST /logic-sequence/{exercise_id}.
+    if payload.mode == "logic_sequence":
+        return _start_logic_sequence_session(db, current_user)
 
     # Validate topic (nếu có)
     topic_enum: Topic | None = None

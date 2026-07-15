@@ -20,9 +20,13 @@ class AssignmentListItem(BaseModel):
     assignment_id: str
     exercise_id: str
     exercise_type: str
-    topic: str                # enum value của Exercise.topic, vd "food_drink"
+    topic: str                # enum value của Exercise.topic, vd "food_drink"; "" với logic_sequence
     order_index: int
     status: Literal["pending", "completed"]
+    # Phân biệt MODALITY để FE chọn màn render: "speech" (nói — mặc định, client cũ
+    # không cần biết field này) | "logic_sequence" (sắp xếp ảnh; exercise_id dùng gọi
+    # /logic-sequence/{id}, assignment_id không có ý nghĩa — set trùng exercise_id).
+    exercise_kind: Literal["speech", "logic_sequence"] = "speech"
 
 
 # ── Từ vựng cho flashcard (GET /vocabulary) ──────────────────────────────────
