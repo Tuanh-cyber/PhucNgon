@@ -12,7 +12,12 @@ from pydantic import BaseModel
 from app.schemas.content import AssignmentListItem
 
 SessionMode = Literal[
-    "naming", "command_identification", "sentence_building", "mixed", "logic_sequence"
+    "naming",
+    "command_identification",
+    "sentence_building",
+    "mixed",
+    "logic_sequence",
+    "color_recognition",
 ]
 
 

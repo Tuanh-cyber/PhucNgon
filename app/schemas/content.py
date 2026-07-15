@@ -24,9 +24,11 @@ class AssignmentListItem(BaseModel):
     order_index: int
     status: Literal["pending", "completed"]
     # Phân biệt MODALITY để FE chọn màn render: "speech" (nói — mặc định, client cũ
-    # không cần biết field này) | "logic_sequence" (sắp xếp ảnh; exercise_id dùng gọi
-    # /logic-sequence/{id}, assignment_id không có ý nghĩa — set trùng exercise_id).
-    exercise_kind: Literal["speech", "logic_sequence"] = "speech"
+    # không cần biết field này) | "logic_sequence" (sắp xếp ảnh; exercise_id = UUID gọi
+    # /logic-sequence/{id}) | "color_recognition" (chọn màu; exercise_id = exercise_code
+    # "CLR..." gọi /color-recognition/{code}). assignment_id với 2 dạng mới không có ý
+    # nghĩa — set trùng exercise_id.
+    exercise_kind: Literal["speech", "logic_sequence", "color_recognition"] = "speech"
 
 
 # ── Từ vựng cho flashcard (GET /vocabulary) ──────────────────────────────────

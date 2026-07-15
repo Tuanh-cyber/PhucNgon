@@ -17,6 +17,7 @@ from app.routers import (
     assessments,
     attempts,
     auth,
+    color_recognition,
     logic_sequence,
     plans,
     sessions,
@@ -52,6 +53,7 @@ app.include_router(vocabulary.router)
 app.include_router(therapist.router)
 app.include_router(sessions.router)
 app.include_router(logic_sequence.router)
+app.include_router(color_recognition.router)
 
 
 # ── Static files: ảnh từ vựng + audio câu hỏi/câu mẫu ────────────────────────

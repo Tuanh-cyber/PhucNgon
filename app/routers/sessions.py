@@ -161,6 +161,73 @@ def _start_logic_sequence_session(db: Session, current_user: User) -> SessionSta
     )
 
 
+def _start_color_recognition_session(db: Session, current_user: User) -> SessionStartResponse:
+    """Phiên color_recognition: 10/12 bài chọn màu — cùng khuôn logic_sequence
+    (không topic, không level, seed ổn định trong ngày, ưu tiên bài chưa hoàn thành).
+    exercises[].exercise_id = exercise_code ("CLR...") để FE gọi /color-recognition/{code}."""
+    from app.models.color_recognition import ColorRecognitionExercise  # import cục bộ
+
+    bank = (
+        db.query(ColorRecognitionExercise)
+        .order_by(ColorRecognitionExercise.exercise_code)
+        .all()
+    )
+    if not bank:
+        raise HTTPException(status_code=409, detail="Chưa có bài nhận biết màu nào (chưa seed)")
+
+    seed = f"{current_user.id}:color_recognition:{date.today().isoformat()}"
+    random.Random(seed).shuffle(bank)
+
+    done_ids = {
+        row[0]
+        for row in db.query(ExerciseSession.color_recognition_exercise_id)
+        .filter(
+            ExerciseSession.patient_id == current_user.id,
+            ExerciseSession.color_recognition_exercise_id.isnot(None),
+            ExerciseSession.status == SessionStatus.graded,
+        )
+        .distinct()
+        .all()
+    }
+    ordered = [e for e in bank if e.id not in done_ids] + [e for e in bank if e.id in done_ids]
+    picked = ordered[:PLANNED_COUNT]  # 12 >= 10 -> đủ
+
+    ts = TherapySession(
+        patient_id=current_user.id,
+        mode="color_recognition",
+        topic=None,
+        vocab_level=None,
+        profile=aphasia_type_to_profile(getattr(current_user, "aphasia_type", None)),
+        started_at=datetime.now(timezone.utc),
+        status="in_progress",
+        planned_count=PLANNED_COUNT,
+    )
+    db.add(ts)
+    db.commit()
+    db.refresh(ts)
+
+    return SessionStartResponse(
+        session_id=str(ts.id),
+        mode="color_recognition",
+        topic=None,
+        vocab_level=None,
+        profile=ts.profile,
+        planned_count=ts.planned_count,
+        exercises=[
+            AssignmentListItem(
+                assignment_id=e.exercise_code,  # không có assignment — trùng exercise_code
+                exercise_id=e.exercise_code,    # FE gọi /color-recognition/{code}
+                exercise_type="color_recognition",
+                topic="",
+                order_index=i,
+                status="completed" if e.id in done_ids else "pending",
+                exercise_kind="color_recognition",
+            )
+            for i, e in enumerate(picked)
+        ],
+    )
+
+
 # ── (a) Bắt đầu phiên: chọn mode + topic -> 10 bài ───────────────────────────
 @router.post("/start", response_model=SessionStartResponse)
 def start_session(
@@ -187,6 +254,8 @@ def start_session(
     # kéo-thả; FE gọi GET/POST /logic-sequence/{exercise_id}.
     if payload.mode == "logic_sequence":
         return _start_logic_sequence_session(db, current_user)
+    if payload.mode == "color_recognition":
+        return _start_color_recognition_session(db, current_user)
 
     # Validate topic (nếu có)
     topic_enum: Topic | None = None
