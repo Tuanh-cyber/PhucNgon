@@ -37,6 +37,7 @@ _CMD_AUDIO_ROUTE, _CMD_AUDIO_DIR = "/static/command-audio", "command_audio_wav"
 _SENT_AUDIO_ROUTE, _SENT_AUDIO_DIR = "/static/sentence-audio", "sentence_instance_wav"
 _VOCAB_AUDIO_ROUTE, _VOCAB_AUDIO_DIR = "/static/vocab-audio", "Vocab"
 _SEQUENCE_ROUTE, _SEQUENCE_DIR = "/static/sequence", "sequence"  # Logic Sequence
+_COLOR_AUDIO_ROUTE, _COLOR_AUDIO_DIR = "/static/color-audio", "color_audio"  # Color Recognition
 
 
 def _base_dir() -> Path:
@@ -102,3 +103,12 @@ def sequence_image_url(step: Optional["SequenceStep"]) -> Optional[str]:
 def instruction_audio_url() -> Optional[str]:
     """URL audio hướng dẫn chung cho mọi bài logic_sequence. Thiếu file -> None."""
     return _url_if_exists(_SEQUENCE_ROUTE, _SEQUENCE_DIR, "instruction_audio.wav")
+
+
+# ── Color Recognition (dạng bài mới #2) ───────────────────────────────────────
+def color_instruction_audio_url(instruction_audio: Optional[str]) -> Optional[str]:
+    """URL audio hỏi màu: /static/color-audio/{file}. Thiếu file -> None.
+    (Ô màu KHÔNG serve ảnh — FE vẽ từ colors.hex_code.)"""
+    if not instruction_audio:
+        return None
+    return _url_if_exists(_COLOR_AUDIO_ROUTE, _COLOR_AUDIO_DIR, instruction_audio)

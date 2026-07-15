@@ -144,6 +144,10 @@ class ExerciseSession(Base):
     logic_sequence_exercise_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("logic_sequence_exercises.id")
     )
+    # Bài color_recognition của lượt làm này (nullable — cùng pattern logic_sequence).
+    color_recognition_exercise_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("color_recognition_exercises.id")
+    )
     # Denormalized association FK for efficient patient-scoped queries
     patient_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False

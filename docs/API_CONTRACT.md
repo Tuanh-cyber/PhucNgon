@@ -601,6 +601,25 @@ Cả 2 endpoint yêu cầu role = patient.
 
 ---
 
+## 10. Color Recognition — dạng bài MỚI #2 (ĐANG XÂY — Giai đoạn 1: dữ liệu + assets)
+
+Nghe audio hỏi màu ("Đâu là màu đỏ?") -> chạm 1 trong 4 Ô MÀU. KHÁC modality bài nói:
+KHÔNG ASR. Cùng kiến trúc additive với logic_sequence (bảng riêng, không đụng bài nói).
+
+**Trạng thái:** GĐ1 xong (bảng `colors`/`color_recognition_exercises` + seed 12 colors /
+12 exercises level 1 + audio tĩnh). **CHƯA có endpoint** — GĐ2 sẽ thêm content/submit.
+
+**Đã chốt cho GĐ2/GĐ3:**
+- Chấm NHỊ PHÂN: chạm đúng màu -> `score=100`; sai -> `score=0`. Ghi vào
+  ExerciseSession/SessionResult qua cột `color_recognition_exercise_id` (nullable, song
+  song `logic_sequence_exercise_id` — migration đã có sẵn).
+- **Ô MÀU VẼ TỪ HEX ở frontend** (`colors.hex_code`, vd `#F44336`) — ảnh PNG nguồn là
+  solid swatch nên KHÔNG serve ảnh; content GĐ2 chỉ trả hex + tên màu.
+- Audio hỏi màu (đã phục vụ): `/static/color-audio/{instruction_audio}`
+  (vd `/static/color-audio/red.wav`; tên có khoảng trắng đã URL-encode: `light%20blue.wav`).
+
+---
+
 ## Quy tắc chung cho mọi API
 
 - Mọi lỗi trả về dạng: `{ "detail": "Nội dung lỗi bằng tiếng Việt" }`
