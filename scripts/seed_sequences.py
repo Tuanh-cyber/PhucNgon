@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
 from app.models.sequence import LogicSequenceExercise, Sequence, SequenceStep
+from app.models.therapy import ExerciseSession
 
 XLSX = Path(__file__).parent.parent / "logic_sequence" / "Sequence Asset.xlsx"
 
@@ -33,7 +34,20 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        # Clear (con -> cha): exercises trỏ sequences; steps cascade từ sequences.
+        # Clear (con -> cha). LỊCH SỬ LÀM BÀI của dạng này (exercise_sessions trỏ
+        # logic_sequence_exercise_id) phải xóa TRƯỚC — không thì FK chặn DELETE exercises.
+        # Xóa qua ORM từng dòng để cascade SessionResult chạy đúng. Chấp nhận mất lịch sử
+        # làm bài SẮP XẾP khi re-seed (DB demo); bài nói KHÔNG bị đụng.
+        old_sessions = (
+            db.query(ExerciseSession)
+            .filter(ExerciseSession.logic_sequence_exercise_id.isnot(None))
+            .all()
+        )
+        for sess in old_sessions:
+            db.delete(sess)
+        db.flush()
+        if old_sessions:
+            print(f"  (đã dọn {len(old_sessions)} lượt làm bài sắp xếp cũ)")
         db.query(LogicSequenceExercise).delete()
         db.query(SequenceStep).delete()
         db.query(Sequence).delete()

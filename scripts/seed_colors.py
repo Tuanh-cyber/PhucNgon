@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
 from app.models.color_recognition import Color, ColorRecognitionExercise
+from app.models.therapy import ExerciseSession
 
 XLSX = Path(__file__).parent.parent / "color_recognition" / "Color Recognition Asset.xlsx"
 
@@ -33,6 +34,17 @@ def main() -> None:
 
     db = SessionLocal()
     try:
+        # Dọn lịch sử làm bài chọn màu trước (FK exercise_sessions.color_recognition_exercise_id)
+        old_sessions = (
+            db.query(ExerciseSession)
+            .filter(ExerciseSession.color_recognition_exercise_id.isnot(None))
+            .all()
+        )
+        for sess in old_sessions:
+            db.delete(sess)
+        db.flush()
+        if old_sessions:
+            print(f"  (đã dọn {len(old_sessions)} lượt làm bài chọn màu cũ)")
         db.query(ColorRecognitionExercise).delete()
         db.query(Color).delete()
         db.flush()
